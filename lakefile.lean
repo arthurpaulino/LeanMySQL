@@ -2,12 +2,13 @@ import Lake
 open System Lake DSL
 
 def leanSoureDir := "lib"
-def cCompiler := "g++"
+def cppCompiler := "g++"
 def cppDir : FilePath := "cpp"
 def ffiSrc := cppDir / "ffi.cpp"
 def ffiO := "ffi.o"
 def ffiLib := "libffi.a"
 def mySQLIncludeDir := "/usr/include/mysql"
+def libsDir := "/usr/lib/x86_64-linux-gnu/"
 def mySQLLinkArg := "-lmysqlclient"
 
 def ffiOTarget (pkgDir : FilePath) : FileTarget :=
@@ -15,7 +16,7 @@ def ffiOTarget (pkgDir : FilePath) : FileTarget :=
   let srcTarget := inputFileTarget <| pkgDir / ffiSrc
   fileTargetWithDep oFile srcTarget fun srcFile => do
     compileO oFile srcFile
-      #["-I", (← getLeanIncludeDir).toString, "-I", mySQLIncludeDir] cCompiler
+      #["-I", (← getLeanIncludeDir).toString, "-I", mySQLIncludeDir] cppCompiler
 
 def cLibTarget (pkgDir : FilePath) : FileTarget :=
   let libFile := pkgDir / defaultBuildDir / cppDir / ffiLib
@@ -25,5 +26,5 @@ package LeanMySQL (pkgDir) {
   srcDir := leanSoureDir
   libRoots := #[`Ffi]
   moreLibTargets := #[cLibTarget pkgDir]
-  moreLinkArgs := #[mySQLLinkArg]
+  moreLinkArgs := #["-L", libsDir, mySQLLinkArg]
 }

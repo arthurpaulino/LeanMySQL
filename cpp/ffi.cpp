@@ -2,30 +2,48 @@
 #include <mysql.h>
 #include <stdio.h>
 
+#define internal inline static
+#define external extern "C"
+#define l_arg b_lean_obj_arg
+#define l_res lean_obj_res
+
 typedef struct mysql {
-    int status = 0;
     MYSQL* connection = NULL;
+    char logged = 0;
+    char* db_name = NULL;
     MYSQL_RES* result = NULL;
 } mysql;
 
 static lean_external_class* g_mysql_external_class = NULL;
 
-lean_object* mysql_box(mysql* m) {
+internal lean_object* mysql_box(mysql* m) {
     return lean_alloc_external(g_mysql_external_class, m);
 }
 
-mysql* mysql_unbox(lean_object* p) {
+internal mysql* mysql_unbox(lean_object* p) {
     return (mysql*) (lean_get_external_data(p));
 }
 
-inline static void close_connection(mysql* m) {
+internal l_res mk_ok() {
+    return lean_io_result_mk_ok(lean_box(0));
+}
+
+internal l_res make_error(const char* err_msg) {
+    return lean_mk_io_user_error(lean_mk_io_user_error(lean_mk_string(err_msg)));
+}
+
+internal void close_connection(mysql* m) {
     mysql_close(m->connection);
+    m->logged = 0;
+    if (m->db_name) {
+        free(m->db_name);
+    }
     if (m->result) {
         free(m->result);
     }
 }
 
-inline static void mysql_finalizer(void* mysql_ptr) {
+internal void mysql_finalizer(void* mysql_ptr) {
     mysql* m = (mysql*) mysql_ptr;
     close_connection(m);
     if (m->connection) {
@@ -34,41 +52,63 @@ inline static void mysql_finalizer(void* mysql_ptr) {
     free(m);
 }
 
-inline static void noop_foreach(void* mod, b_lean_obj_arg fn) {}
+internal void noop_foreach(void* mod, l_arg fn) {}
 
-extern "C" lean_obj_res lean_mysql_initialize() {
+external l_res lean_mysql_initialize() {
     g_mysql_external_class = lean_register_external_class(mysql_finalizer, noop_foreach);
     return lean_io_result_mk_ok(lean_box(0));
 }
 
-extern "C" lean_obj_res lean_mysql_mk() {
+external l_res lean_mysql_mk() {
     mysql* m = (mysql*) malloc(sizeof(mysql));
     return lean_io_result_mk_ok(mysql_box(m));
 }
 
-extern "C" lean_obj_res lean_mysql_connect(
-        b_lean_obj_arg m_,
-        b_lean_obj_arg h_, b_lean_obj_arg u_, b_lean_obj_arg p_, b_lean_obj_arg d_
-    ) {
+external l_res lean_mysql_version() {
+    return lean_io_result_mk_ok(lean_mk_string(mysql_get_client_info()));
+}
+
+external l_res lean_mysql_login(l_arg m_, l_arg h_, l_arg u_, l_arg p_) {
     mysql* m = mysql_unbox(m_);
+    if (m->logged) {
+        return make_error("Already logged in. Try using 'close' first.");
+    }
     m->connection = mysql_init(NULL);
     const char* h = lean_string_cstr(h_);
     const char* u = lean_string_cstr(u_);
     const char* p = lean_string_cstr(p_);
-    const char* d = lean_string_cstr(d_);
     MYSQL *connection_ret = mysql_real_connect(
         m->connection,
-        h, u, p, d,
-        0, NULL, 0
+        h, u, p,
+        NULL, 0, NULL, 0
     );
-    if (connection_ret == NULL) {
-        printf("%s\n", (char*) mysql_error(m->connection));
-    }
 
+    if (connection_ret == NULL) {
+        return make_error(mysql_error(m->connection));
+    }
+    else {
+        m->logged = 1;
+        return lean_io_result_mk_ok(lean_box(0));
+    }
+}
+
+external l_res lean_mysql_create_db(l_arg m_, l_arg d_) {
+    mysql* m = mysql_unbox(m_);
+    if (!m->logged) {
+        return make_error("Not logged in.");
+    }
     return lean_io_result_mk_ok(lean_box(0));
 }
 
-extern "C" lean_obj_res lean_mysql_close(b_lean_obj_arg m_) {
+external l_res lean_mysql_use_db(l_arg m_, l_arg d_) {
+    mysql* m = mysql_unbox(m_);
+    if (!m->logged) {
+        return make_error("Not logged in.");
+    }
+    return lean_io_result_mk_ok(lean_box(0));
+}
+
+external l_res lean_mysql_close(l_arg m_) {
     mysql* m = mysql_unbox(m_);
     close_connection(m);
     return lean_io_result_mk_ok(lean_box(0));
