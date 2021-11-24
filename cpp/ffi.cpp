@@ -1,5 +1,6 @@
 #include <lean/lean.h>
 #include <mysql.h>
+#include <string>
 #include <stdio.h>
 
 #define internal inline static
@@ -7,12 +8,17 @@
 #define l_arg b_lean_obj_arg
 #define l_res lean_obj_res
 
+using namespace std;
+
 typedef struct mysql {
     MYSQL* connection = NULL;
-    char logged = 0;
-    char* db_name = NULL;
+    char       logged = 0;
+    int        status = 0;
+    char*     db_name = NULL;
     MYSQL_RES* result = NULL;
 } mysql;
+
+MYSQL_ROW row;
 
 static lean_external_class* g_mysql_external_class = NULL;
 
@@ -22,10 +28,6 @@ internal lean_object* mysql_box(mysql* m) {
 
 internal mysql* mysql_unbox(lean_object* p) {
     return (mysql*) (lean_get_external_data(p));
-}
-
-internal l_res mk_ok() {
-    return lean_io_result_mk_ok(lean_box(0));
 }
 
 internal l_res make_error(const char* err_msg) {
@@ -54,6 +56,18 @@ internal void mysql_finalizer(void* mysql_ptr) {
 
 internal void noop_foreach(void* mod, l_arg fn) {}
 
+internal void query_all(mysql* m, string q) {
+    m->status = mysql_query(m->connection, q.data());
+    m->result = mysql_store_result(m->connection);
+}
+
+internal void query_some(mysql* m, string q) {
+    m->status = mysql_query(m->connection, q.data());
+    m->result = mysql_use_result(m->connection);
+}
+
+// API
+
 external l_res lean_mysql_initialize() {
     g_mysql_external_class = lean_register_external_class(mysql_finalizer, noop_foreach);
     return lean_io_result_mk_ok(lean_box(0));
@@ -73,7 +87,12 @@ external l_res lean_mysql_login(l_arg m_, l_arg h_, l_arg u_, l_arg p_) {
     if (m->logged) {
         return make_error("Already logged in. Try using 'close' first.");
     }
+
     m->connection = mysql_init(NULL);
+    if (m->connection == NULL) {
+        return make_error("Failed to instantiate a connection with MySQL.");
+    }
+
     const char* h = lean_string_cstr(h_);
     const char* u = lean_string_cstr(u_);
     const char* p = lean_string_cstr(p_);
@@ -97,7 +116,17 @@ external l_res lean_mysql_create_db(l_arg m_, l_arg d_) {
     if (!m->logged) {
         return make_error("Not logged in.");
     }
-    return lean_io_result_mk_ok(lean_box(0));
+
+    string q = "CREATE DATABASE ";
+    q = q + lean_string_cstr(d_);
+
+    query_all(m, q);
+    if (m->status) {
+        return make_error(mysql_error(m->connection));
+    }
+    else {
+        return lean_io_result_mk_ok(lean_box(0));
+    }
 }
 
 external l_res lean_mysql_use_db(l_arg m_, l_arg d_) {
