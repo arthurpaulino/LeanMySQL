@@ -17,11 +17,20 @@ instance : Coe String Entry where
 instance : Coe Float Entry where
   coe := Entry.float
 
-private constant entryListToStringList (l : List Entry) : List String :=
-l.map λ e => match e with
+abbrev Row := List Entry
+
+namespace Row
+
+private constant toStrings (r : Row) : List String :=
+r.map λ e => match e with
   | Entry.str e => s!"'{e}'"
   | Entry.nat e => toString e
   | Entry.float e => toString e
+
+private constant build (r : Row) : String :=
+s!"({",".intercalate (r.toStrings)})"
+
+end Row
 
 structure Column where
   name : String
@@ -88,8 +97,8 @@ m.run ("CREATE TABLE " ++ (n ++ ts.build))
 constant dropTable (m : MySQL) (n : String) : IO Unit :=
 m.run ("DROP TABLE " ++ n)
 
-constant insertIntoTable (m : MySQL) (n : String) (l : List Entry) : IO Unit :=
-m.run s!"INSERT INTO {n} VALUES({",".intercalate (entryListToStringList l)})"
+constant insertIntoTable (m : MySQL) (n : String) (r : Row) : IO Unit :=
+m.run s!"INSERT INTO {n} VALUES{r.build}"
 
 @[extern "lean_mysql_close"]
 constant close (m : MySQL) : BaseIO Unit
