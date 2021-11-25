@@ -1,5 +1,5 @@
 #include <lean/lean.h>
-#include <mysql.h>
+#include <mysql/mysql.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -70,9 +70,7 @@ internal l_res lean_mysql_manage_db(l_arg m_, l_arg q_) {
     if (m->status) {
         return make_error(mysql_error(m->connection));
     }
-    else {
-        return lean_io_result_mk_ok(lean_box(0));
-    }
+    return lean_io_result_mk_ok(lean_box(0));
 }
 
 // API
@@ -122,6 +120,36 @@ external l_res lean_mysql_login(l_arg m_, l_arg h_, l_arg u_, l_arg p_) {
 
 external l_res lean_mysql_run(l_arg m_, l_arg q_) {
     return lean_mysql_manage_db(m_, q_);
+}
+
+external l_res lean_mysql_query(l_arg m_, l_arg q_) {
+    mysql* m = mysql_unbox(m_);
+    if (!m->logged) {
+        return make_error("Not logged in.");
+    }
+
+    query_all(m, lean_string_cstr(q_));
+    if (m->status) {
+        return make_error(mysql_error(m->connection));
+    }
+
+    int num_fields = mysql_num_fields(m->result);
+    MYSQL_ROW row;
+    MYSQL_FIELD *field;
+
+    while ((row = mysql_fetch_row(m->result))) {
+        for(int i = 0; i < num_fields; i++) {
+            if (i == 0) {
+                while(field = mysql_fetch_field(m->result)) {
+                    printf("%s\t", field->name);
+                }
+                printf("\n");
+            }
+            printf("%s\t", row[i] ? row[i] : "NULL");
+        }
+    }
+
+    return lean_io_result_mk_ok(lean_mk_string(""));
 }
 
 external l_res lean_mysql_close(l_arg m_) {

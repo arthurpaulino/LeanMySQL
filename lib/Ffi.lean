@@ -53,18 +53,96 @@ s!"({",".intercalate (ts.map λ v => v.build)})"
 
 end TableScheme
 
-structure Query where
-  Select : String
-  From : String
-  Where : String
-  deriving Inhabited
+--------------------------
+
+abbrev Col := Lean.Name
+
+private inductive ColProp
+  | EqE (c : Col) (e : Entry)
+  | NeqE (c : Col) (e : Entry)
+  | LeE (c : Col) (e : Entry)
+  | LE (c : Col) (e : Entry)
+  | GeE (c : Col) (e : Entry)
+  | GE (c : Col) (e : Entry)
+  | EqC (c : Col) (c' : Col)
+  | NeqC (c : Col) (c' : Col)
+  | LeC (c : Col) (c' : Col)
+  | LC (c : Col) (c' : Col)
+  | GeC (c : Col) (c' : Col)
+  | GC (c : Col) (c' : Col)
+  | And (cp : ColProp) (cp' : ColProp)
+  | Or (cp : ColProp) (cp' : ColProp)
+
+infix:50 " = " => ColProp.EqE
+infix:50 " ≠ " => ColProp.NeqE
+infix:50 " ≤ " => ColProp.LeE
+infix:50 " < " => ColProp.LE
+infix:50 " ≥ " => ColProp.GeE
+infix:50 " > " => ColProp.GE
+infix:50 " = " => ColProp.EqC
+infix:50 " ≠ " => ColProp.NeqC
+infix:50 " ≤ " => ColProp.LeC
+infix:50 " < " => ColProp.LC
+infix:50 " ≥ " => ColProp.GeC
+infix:50 " > " => ColProp.GC
+infix:25 " ∧ " => ColProp.And
+infix:25 " ∨ " => ColProp.Or
+
+mutual
+  inductive Query
+    | mk (steps : List QueryStep)
+  private inductive QueryStep
+    | table (n : String)
+    | select (l : List Col)
+    | filter (cp : ColProp)
+    | join (q : Query) (on : ColProp) (how : String)
+end
 
 namespace Query
-
-private constant build (mq : Query) : String :=
-s!"(SELECT {mq.Select} FROM {mq.From} WHERE {mq.Where})"
-
+private def steps : Query → List QueryStep
+| mk steps => steps
 end Query
+
+constant table (n : String) : Query :=
+⟨[QueryStep.table n]⟩
+
+constant select (l : List Col) (q : Query) : Query :=
+⟨q.steps.concat (QueryStep.select l)⟩
+
+constant filter (cp : ColProp) (q : Query)  : Query :=
+⟨q.steps.concat (QueryStep.filter cp)⟩
+
+constant join (q' : Query) (on : ColProp) (how : String) (q : Query) : Query :=
+⟨q.steps.concat (QueryStep.join q' on how)⟩
+
+private constant transform (q : Query) (f : Query → Query) : Query := f q
+
+infixl:50 "↠" => transform
+
+/-
+#todo
+Find a way to transform a Query like
+
+```
+table "cars" ↠
+select [`id, `name] ↠
+join (table "prices") (`l.id = `r.id) "left" ↠
+filter (`price = 2)
+```
+
+into:
+
+```
+select *
+from (select id,name from car) as l left join (select * from price) as r on l.id=r.id
+where price = 2;
+```
+-/
+namespace Query
+private constant build (q : Query) : String := sorry
+end Query
+
+---------------------
 
 constant MySQL : Type
 
@@ -99,6 +177,11 @@ m.run ("DROP TABLE " ++ n)
 
 constant insertIntoTable (m : MySQL) (n : String) (r : Row) : IO Unit :=
 m.run s!"INSERT INTO {n} VALUES{r.build}"
+
+@[extern "lean_mysql_query"]
+constant querySQL (m : MySQL) (q : String) : IO String
+
+constant query (m : MySQL) (q : Query) : IO String := m.querySQL q.build
 
 @[extern "lean_mysql_close"]
 constant close (m : MySQL) : BaseIO Unit
