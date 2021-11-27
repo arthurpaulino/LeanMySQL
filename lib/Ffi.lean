@@ -21,13 +21,13 @@ abbrev Row := List Entry
 
 namespace Row
 
-private constant toStrings (r : Row) : List String :=
+private def toStrings (r : Row) : List String :=
 r.map λ e => match e with
   | Entry.str e => s!"'{e}'"
   | Entry.nat e => toString e
   | Entry.float e => toString e
 
-private constant build (r : Row) : String :=
+private def build (r : Row) : String :=
 s!"({",".intercalate (r.toStrings)})"
 
 end Row
@@ -39,7 +39,7 @@ structure Column where
 
 namespace Column
 
-private constant build (c : Column) : String :=
+private def build (c : Column) : String :=
 s!"{c.name} {c.type}"
 
 end Column
@@ -48,7 +48,7 @@ abbrev TableScheme := List Column
 
 namespace TableScheme
 
-private constant build (ts : TableScheme) : String :=
+private def build (ts : TableScheme) : String :=
 s!"({",".intercalate (ts.map λ v => v.build)})"
 
 end TableScheme
@@ -90,34 +90,39 @@ infix:25 " ∨ " => ColProp.Or
 
 mutual
   inductive Query
-    | mk (steps : List QueryStep)
+    | mk (name : String) (steps : List QueryStep)
   private inductive QueryStep
-    | table (n : String)
     | select (l : List Col)
     | filter (cp : ColProp)
     | join (q : Query) (on : ColProp) (how : String)
 end
 
+def table (n : String) : Query := ⟨n, []⟩
+
 namespace Query
+
+private def name : Query → String
+| mk name _ => name
+
 private def steps : Query → List QueryStep
-| mk steps => steps
+| mk _ steps => steps
+
 end Query
 
-constant table (n : String) : Query :=
-⟨[QueryStep.table n]⟩
+def select (l : List Col) (q : Query) : Query :=
+⟨q.name, q.steps.concat (QueryStep.select l)⟩
 
-constant select (l : List Col) (q : Query) : Query :=
-⟨q.steps.concat (QueryStep.select l)⟩
+def filter (cp : ColProp) (q : Query)  : Query :=
+⟨q.name, q.steps.concat (QueryStep.filter cp)⟩
 
-constant filter (cp : ColProp) (q : Query)  : Query :=
-⟨q.steps.concat (QueryStep.filter cp)⟩
+def join (q' : Query) (on : ColProp) (how : String) (q : Query) : Query :=
+⟨q.name, q.steps.concat (QueryStep.join q' on how)⟩
 
-constant join (q' : Query) (on : ColProp) (how : String) (q : Query) : Query :=
-⟨q.steps.concat (QueryStep.join q' on how)⟩
-
-private constant transform (q : Query) (f : Query → Query) : Query := f q
+private def transform (q : Query) (f : Query → Query) : Query := f q
 
 infixl:50 "↠" => transform
+
+namespace Query
 
 /-
 #todo
@@ -138,9 +143,24 @@ from (select id,name from car) as l left join (select * from price) as r on l.id
 where price = 2;
 ```
 -/
-namespace Query
-private constant build (q : Query) : String := sorry
+private def build (q : Query) : String := sorry
+
 end Query
+
+structure Table where
+  types : List Type
+  rows : List Row
+  deriving Inhabited
+
+namespace Table
+
+private def parse (s : String) : Table := do
+  if s.length = 0 then
+    ⟨[],[]⟩
+  else
+    ⟨[],[]⟩
+
+end Table
 
 ---------------------
 
@@ -149,7 +169,10 @@ constant MySQL : Type
 namespace MySQL
 
 @[extern "lean_mysql_mk"]
-constant mk : IO MySQL
+constant mk (bufferSizeKB : Nat := 8) : IO MySQL
+
+@[extern "lean_mysql_set_buffer_size"]
+constant setBufferSizeMB (bufferSizeKB : Nat) : IO Unit
 
 @[extern "lean_mysql_version"]
 constant version (m : MySQL) : BaseIO String
@@ -160,28 +183,41 @@ constant login (m : MySQL) (h u p : String) : IO Unit
 @[extern "lean_mysql_run"]
 private constant run (m : MySQL) (q : String) : IO Unit
 
-constant createDB (m : MySQL) (d : String) : IO Unit :=
-m.run ("CREATE DATABASE " ++ d)
+def createDB (m : MySQL) (d : String) : IO Unit :=
+m.run ("create database " ++ d)
 
-constant dropDB (m : MySQL) (d : String) : IO Unit :=
-m.run ("DROP DATABASE " ++ d)
+def dropDB (m : MySQL) (d : String) : IO Unit :=
+m.run ("drop database " ++ d)
 
-constant useDB (m : MySQL) (d : String) : IO Unit :=
-m.run ("USE " ++ d)
+def useDB (m : MySQL) (d : String) : IO Unit :=
+m.run ("use " ++ d)
 
-constant createTable (m : MySQL) (n : String) (ts : TableScheme) : IO Unit :=
-m.run ("CREATE TABLE " ++ (n ++ ts.build))
+def createTable (m : MySQL) (n : String) (ts : TableScheme) : IO Unit :=
+m.run ("create table " ++ (n ++ ts.build))
 
-constant dropTable (m : MySQL) (n : String) : IO Unit :=
-m.run ("DROP TABLE " ++ n)
+def dropTable (m : MySQL) (n : String) : IO Unit :=
+m.run ("drop table " ++ n)
 
-constant insertIntoTable (m : MySQL) (n : String) (r : Row) : IO Unit :=
-m.run s!"INSERT INTO {n} VALUES{r.build}"
+def insertIntoTable (m : MySQL) (n : String) (r : Row) : IO Unit :=
+m.run s!"insert into {n} values{r.build}"
+
+------ querying
 
 @[extern "lean_mysql_query"]
-constant querySQL (m : MySQL) (q : String) : IO String
+private constant querySQLPriv (m : MySQL) (q : String) : IO Unit
 
-constant query (m : MySQL) (q : Query) : IO String := m.querySQL q.build
+def querySQL (m : MySQL) (q : String) : IO Unit := m.querySQLPriv q
+
+/-# todo
+  constant query (m : MySQL) (q : Query) : IO Unit := m.querySQL q.build
+-/
+
+------ extract query result
+
+@[extern "lean_mysql_get_query_result"]
+private constant getQueryResultPriv (m : MySQL) : String
+
+def getQueryResult (m : MySQL) : Table := Table.parse (getQueryResultPriv m)
 
 @[extern "lean_mysql_close"]
 constant close (m : MySQL) : BaseIO Unit

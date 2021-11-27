@@ -1,5 +1,6 @@
 #include <lean/lean.h>
 #include <mysql/mysql.h>
+#include <mysql/field_types.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -8,10 +9,16 @@
 #define l_arg b_lean_obj_arg
 #define l_res lean_obj_res
 
+const char* ERR_INCR_BFFR = "Not enough memory. Try increasing the buffer size.";
+
 typedef struct mysql {
     MYSQL* connection = NULL;
     char       logged = 0;
     int        status = 0;
+    int   buffer_size = 0;
+    int    buffer_pos = 0;
+    char*      buffer = NULL;
+    char   has_result = 0;
     MYSQL_RES* result = NULL;
 } mysql;
 
@@ -45,6 +52,7 @@ internal void mysql_finalizer(void* mysql_ptr) {
     if (m->connection) {
         free(m->connection);
     }
+    free(m->buffer);
     free(m);
 }
 
@@ -73,6 +81,39 @@ internal l_res lean_mysql_manage_db(l_arg m_, l_arg q_) {
     return lean_io_result_mk_ok(lean_box(0));
 }
 
+internal char append_to_buffer(mysql* m, const char* s) {
+    int size = strlen(s);
+    if (m->buffer_size - m->buffer_pos < size + 1) {
+        return 0;
+    }
+    memcpy(m->buffer + m->buffer_pos, s, size + 1);
+    m->buffer_pos = m->buffer_pos + size;
+    return 1;
+}
+
+internal const char* type_to_str(int t) {
+    switch (t) {
+        case MYSQL_TYPE_TINY:
+            return "nat";
+        case MYSQL_TYPE_SHORT:
+            return "nat";
+        case MYSQL_TYPE_LONG:
+            return "nat";
+        case MYSQL_TYPE_LONGLONG:
+            return "nat";
+        case MYSQL_TYPE_INT24:
+            return "nat";
+        case MYSQL_TYPE_DECIMAL:
+            return "float";
+        case MYSQL_TYPE_FLOAT:
+            return "float";
+        case MYSQL_TYPE_DOUBLE:
+            return "float";
+        default:
+            return "string";
+    }
+}
+
 // API
 
 external l_res lean_mysql_initialize() {
@@ -80,9 +121,29 @@ external l_res lean_mysql_initialize() {
     return lean_io_result_mk_ok(lean_box(0));
 }
 
-external l_res lean_mysql_mk() {
+external l_res lean_mysql_mk(uint32_t b) {
     mysql* m = (mysql*) malloc(sizeof(mysql));
+    int size = (b - 1) * 1024;
+    char* buffer = (char*)malloc(size);
+    if (buffer == NULL) {
+        return make_error("Not enough memory to allocate buffer.");
+    }
+    m->buffer = buffer;
+    m->buffer_size = size;
     return lean_io_result_mk_ok(mysql_box(m));
+}
+
+external l_res lean_mysql_set_buffer_size(l_arg m_, uint32_t b) {
+    mysql* m = mysql_unbox(m_);
+    int size = (b - 1) * 1024;
+    char* buffer = (char*)malloc(size);
+    if (buffer == NULL) {
+        return make_error("Not enough memory to allocate buffer.");
+    }
+    free(m->buffer);
+    m->buffer = buffer;
+    m->buffer_size = size;
+    return lean_io_result_mk_ok(lean_box(0));
 }
 
 external l_res lean_mysql_version() {
@@ -134,22 +195,64 @@ external l_res lean_mysql_query(l_arg m_, l_arg q_) {
     }
 
     int num_fields = mysql_num_fields(m->result);
+    MYSQL_FIELD* field;
     MYSQL_ROW row;
-    MYSQL_FIELD *field;
 
-    while ((row = mysql_fetch_row(m->result))) {
-        for(int i = 0; i < num_fields; i++) {
-            if (i == 0) {
-                while(field = mysql_fetch_field(m->result)) {
-                    printf("%s\t", field->name);
-                }
-                printf("\n");
+    m->buffer_pos = 0;
+    m->has_result = 0;
+
+    for(int i = 0; i < num_fields; i++) {
+        field = mysql_fetch_field(m->result);
+        if (!append_to_buffer(m, field->name)) {
+            return make_error(ERR_INCR_BFFR);
+        }
+        if (!append_to_buffer(m, " ")) {
+            return make_error(ERR_INCR_BFFR);
+        }
+        if (!append_to_buffer(m, type_to_str(field->type))) {
+            return make_error(ERR_INCR_BFFR);
+        }
+        if (i < num_fields - 1) {
+            if (!append_to_buffer(m, "~")) {
+                return make_error(ERR_INCR_BFFR);
             }
-            printf("%s\t", row[i] ? row[i] : "NULL");
+        }
+    }
+    if (!append_to_buffer(m, "¨")) {
+        return make_error(ERR_INCR_BFFR);
+    }
+
+    while (row = mysql_fetch_row(m->result)) {
+        for(int i = 0; i < num_fields; i++) {
+            if (!append_to_buffer(m, row[i] ? row[i] : "NULL")) {
+                return make_error(ERR_INCR_BFFR);
+            }
+            if (i < num_fields - 1) {
+                if (!append_to_buffer(m, "~")) {
+                    return make_error(ERR_INCR_BFFR);
+                }
+            }
+        }
+        if (!append_to_buffer(m, "¨")) {
+            return make_error(ERR_INCR_BFFR);
         }
     }
 
-    return lean_io_result_mk_ok(lean_mk_string(""));
+    if (!append_to_buffer(m, "\0")) {
+        return make_error(ERR_INCR_BFFR);
+    }
+
+    m->has_result = 1;
+
+    return lean_io_result_mk_ok(lean_box(0));
+}
+
+external l_res lean_mysql_get_query_result(l_arg m_) {
+    mysql* m = mysql_unbox(m_);
+    if (!m->has_result) {
+        return lean_io_result_mk_ok(lean_mk_string(""));
+    }
+    return lean_mk_string(m->buffer);
 }
 
 external l_res lean_mysql_close(l_arg m_) {

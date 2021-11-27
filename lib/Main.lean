@@ -1,7 +1,7 @@
 import Ffi
 
 def main : IO Unit := do
-  let mysql ← MySQL.mk
+  let mysql ← MySQL.mk 1
   mysql.login "localhost" "root" "root"
   -- mysql.close
   -- mysql.login "localhost" "root" "root"
@@ -26,8 +26,5 @@ def main : IO Unit := do
   -- mysql.insertIntoTable "price" [1, 3]
   -- mysql.insertIntoTable "price" [2, 2]
   -- mysql.insertIntoTable "price" [3, 1]
-  let q := table "cars" ↠
-    select [`id, `name] ↠
-    join (table "prices") (`l.id = `r.id) "left" ↠
-    filter (`price = 2)
-  IO.println <| ← mysql.querySQL "select * from car"
+  -- IO.println <| ← mysql.querySQL "select * from price"
+  mysql.querySQL "select * from price"
