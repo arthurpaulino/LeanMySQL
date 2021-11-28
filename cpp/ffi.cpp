@@ -94,15 +94,15 @@ internal char append_to_buffer(mysql* m, const char* s) {
 internal const char* type_to_str(int t) {
     switch (t) {
         case MYSQL_TYPE_TINY:
-            return "nat";
+            return "int";
         case MYSQL_TYPE_SHORT:
-            return "nat";
+            return "int";
         case MYSQL_TYPE_LONG:
-            return "nat";
+            return "int";
         case MYSQL_TYPE_LONGLONG:
-            return "nat";
+            return "int";
         case MYSQL_TYPE_INT24:
-            return "nat";
+            return "int";
         case MYSQL_TYPE_DECIMAL:
             return "float";
         case MYSQL_TYPE_FLOAT:

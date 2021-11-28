@@ -5,11 +5,11 @@ builtin_initialize initMySQL
 
 inductive Entry
   | str (s : String)
-  | nat (n : Nat)
+  | int (n : Int)
   | float (f : Float)
 
-instance : Coe Nat Entry where
-  coe := Entry.nat
+instance : Coe Int Entry where
+  coe := Entry.int
 
 instance : Coe String Entry where
   coe := Entry.str
@@ -24,7 +24,7 @@ namespace Row
 private def toStrings (r : Row) : List String :=
 r.map λ e => match e with
   | Entry.str e => s!"'{e}'"
-  | Entry.nat e => toString e
+  | Entry.int e => toString e
   | Entry.float e => toString e
 
 private def build (r : Row) : String :=
@@ -147,18 +147,89 @@ private def build (q : Query) : String := sorry
 
 end Query
 
+inductive DType | DInt | DFloat | DString
+
+def DType.toType : DType → Type
+| DInt => Int
+| DFloat => Float
+| DString => String
+
 structure Table where
-  types : List Type
+  names : List String
+  types : List DType
   rows : List Row
   deriving Inhabited
 
 namespace Table
 
+private def dTypesMap (t : String) : DType :=
+  if t = "int" then
+    DType.DInt
+  else
+    if t = "float" then
+      DType.DFloat
+    else
+      DType.DString
+
+private def toFloat (s : String) : Float := do
+  let split := s.splitOn "."
+  let l := split.head!.splitOn "-"
+  let r := split.getLast!
+  let rFloat := r.toNat!.toFloat / (10.0 ^ r.length.toFloat)
+  if l.length = 1 then
+    return l.head!.toNat!.toFloat + rFloat
+  else
+    return -1.0 * (l.getLast!.toNat!.toFloat + rFloat)
+
 private def parse (s : String) : Table := do
   if s.length = 0 then
-    ⟨[],[]⟩
+    ⟨[], [], []⟩
   else
-    ⟨[],[]⟩
+    let mut names : List String := []
+    let mut dTypes : List DType := []
+    let mut data : List Row := []
+    let lines : List String := s.splitOn "¨"
+    let header : String := lines.head!
+    let headerParts : List String := header.splitOn "~"
+    for headerPart in headerParts do
+      let split : List String := headerPart.splitOn " "
+      names := names.concat (split.head!)
+      dTypes := dTypes.concat (dTypesMap (split.getLast!))
+    let mut i : Nat := 0
+    let maxI : Nat := lines.tail!.length
+    for row in lines.tail! do
+      let mut j : Nat := 0
+      let mut rowData : List Entry := []
+      let rowSplit := row.splitOn "~"
+      for dType in dTypes do
+        let valString : String := rowSplit.get! j
+        match dType with
+        | DType.DInt => rowData := rowData.concat (valString.toInt!)
+        | DType.DFloat => rowData := rowData.concat (toFloat valString)
+        | DType.DString => rowData := rowData.concat (valString)
+        j := j + 1
+      data := data.concat rowData
+      i := i + 1
+      if i = maxI - 1 then
+        break
+    ⟨names, dTypes, data⟩
+
+def toString (t : Table) : String := do
+  let mut res : String := ""
+  for n in t.names do
+    res := res ++ n ++ "|"
+  res := res ++ "\n"
+  let mut i : Nat := 0
+  let maxI : Nat := t.rows.length
+  for row in t.rows do
+    let rowStrings := row.toStrings
+    for s in rowStrings do
+      res := res ++ s ++ "|"
+    if i = maxI - 1 then
+      break
+    res := res ++ "\n"
+    i := i + 1
+  res
 
 end Table
 
