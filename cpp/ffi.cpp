@@ -39,11 +39,9 @@ internal l_res make_error(const char* err_msg) {
 }
 
 internal void close_connection(mysql* m) {
-    mysql_close(m->connection);
     m->logged = 0;
-    if (m->result) {
-        free(m->result);
-    }
+    mysql_free_result(m->result);
+    mysql_close(m->connection);
 }
 
 internal void mysql_finalizer(void* mysql_ptr) {
