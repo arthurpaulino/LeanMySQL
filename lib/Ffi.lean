@@ -142,8 +142,8 @@ select *
 from (select id,name from car) as l left join (select * from price) as r on l.id=r.id
 where price = 2;
 ```
--/
 private def build (q : Query) : String := sorry
+-/
 
 end Query
 

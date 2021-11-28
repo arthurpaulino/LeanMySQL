@@ -22,8 +22,6 @@ typedef struct mysql {
     MYSQL_RES* result = NULL;
 } mysql;
 
-MYSQL_ROW row;
-
 static lean_external_class* g_mysql_external_class = NULL;
 
 internal lean_object* mysql_box(mysql* m) {
@@ -56,27 +54,9 @@ internal void mysql_finalizer(void* mysql_ptr) {
 
 internal void noop_foreach(void* mod, l_arg fn) {}
 
-internal void query_all(mysql* m, const char* q) {
+internal void query(mysql* m, const char* q) {
     m->status = mysql_query(m->connection, q);
     m->result = mysql_store_result(m->connection);
-}
-
-internal void query_some(mysql* m, const char* q) {
-    m->status = mysql_query(m->connection, q);
-    m->result = mysql_use_result(m->connection);
-}
-
-internal l_res lean_mysql_manage_db(l_arg m_, l_arg q_) {
-    mysql* m = mysql_unbox(m_);
-    if (!m->logged) {
-        return make_error("Not logged in.");
-    }
-
-    query_all(m, lean_string_cstr(q_));
-    if (m->status) {
-        return make_error(mysql_error(m->connection));
-    }
-    return lean_io_result_mk_ok(lean_box(0));
 }
 
 internal char append_to_buffer(mysql* m, const char* s) {
@@ -178,7 +158,16 @@ external l_res lean_mysql_login(l_arg m_, l_arg h_, l_arg u_, l_arg p_) {
 }
 
 external l_res lean_mysql_run(l_arg m_, l_arg q_) {
-    return lean_mysql_manage_db(m_, q_);
+    mysql* m = mysql_unbox(m_);
+    if (!m->logged) {
+        return make_error("Not logged in.");
+    }
+
+    query(m, lean_string_cstr(q_));
+    if (m->status) {
+        return make_error(mysql_error(m->connection));
+    }
+    return lean_io_result_mk_ok(lean_box(0));
 }
 
 external l_res lean_mysql_query(l_arg m_, l_arg q_) {
@@ -187,7 +176,7 @@ external l_res lean_mysql_query(l_arg m_, l_arg q_) {
         return make_error("Not logged in.");
     }
 
-    query_all(m, lean_string_cstr(q_));
+    query(m, lean_string_cstr(q_));
     if (m->status) {
         return make_error(mysql_error(m->connection));
     }
