@@ -2,30 +2,36 @@ import Ffi
 
 def main : IO Unit := do
   let mysql ← MySQL.mk
+  IO.println $ mysql.version
   mysql.login "localhost" "root" "root"
   -- mysql.close
   -- mysql.login "localhost" "root" "root"
 
+  -- mysql.createDB "test_db"
   -- mysql.dropDB "test_db"
   -- mysql.createDB "test_db"
 
   mysql.useDB "test_db"
 
-  -- mysql.createTable "car" [
-  --     ⟨"id", "INT PRIMARY KEY"⟩,
-  --     ⟨"name", "VARCHAR(255)"⟩
-  --   ]
-  -- mysql.insertIntoTable "car" [1, "A"]
-  -- mysql.insertIntoTable "car" [2, "B"]
-  -- mysql.insertIntoTable "car" [3, "C"]
-
-  -- mysql.createTable "price" [
+  -- mysql.createTable "job" [
   --   ⟨"id", "INT PRIMARY KEY"⟩,
-  --   ⟨"price", "INT"⟩
+  --   ⟨"name", "VARCHAR(255)"⟩
   -- ]
-  -- mysql.insertIntoTable "price" [1, 3]
-  -- mysql.insertIntoTable "price" [2, 2]
-  -- mysql.insertIntoTable "price" [3, 1]
-  -- IO.println <| ← mysql.querySQL "select * from price"
-  mysql.querySQL "select car.id, car.name, price.price from car join price on car.id = price.id"
-  IO.println <| mysql.getQueryResult.toString
+  -- mysql.insertIntoTable "job" [1, "Computer Scientist"]
+  -- mysql.insertIntoTable "job" [2, "Mathematician"]
+
+  -- mysql.createTable "person" [
+  --     ⟨"id", "INT PRIMARY KEY"⟩,
+  --     ⟨"name", "VARCHAR(255)"⟩,
+  --     ⟨"age", "INT"⟩,
+  --     ⟨"job_id", "INT"⟩
+  --   ]
+
+  -- mysql.insertIntoTable "person" [1, "Alice", 20, 1]
+  -- mysql.insertIntoTable "person" [2, "Bob", 21, 2]
+  -- mysql.insertIntoTable "person" [3, "Craig", 22, NULL]
+
+  mysql.querySQL ("select person.name, person.age, job.name " ++
+    "from person left join job on person.job_id = job.id")
+  mysql.close
+  IO.println $ mysql.getQueryResult

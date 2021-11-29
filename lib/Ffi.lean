@@ -7,6 +7,9 @@ inductive Entry
   | str (s : String)
   | int (n : Int)
   | float (f : Float)
+  | null
+
+constant NULL : Entry := Entry.null
 
 instance : Coe Int Entry where
   coe := Entry.int
@@ -26,6 +29,7 @@ r.map λ e => match e with
   | Entry.str e => s!"'{e}'"
   | Entry.int e => toString e
   | Entry.float e => toString e
+  | Entry.null => "NULL"
 
 private def build (r : Row) : String :=
 s!"({",".intercalate (r.toStrings)})"
@@ -147,12 +151,7 @@ private def build (q : Query) : String := sorry
 
 end Query
 
-inductive DType | DInt | DFloat | DString
-
-def DType.toType : DType → Type
-| DInt => Int
-| DFloat => Float
-| DString => String
+private inductive DType | DInt | DFloat | DString
 
 structure Table where
   names : List String
@@ -163,13 +162,17 @@ structure Table where
 namespace Table
 
 private def dTypesMap (t : String) : DType :=
-  if t = "int" then
+  if t = "i" then
     DType.DInt
   else
-    if t = "float" then
+    if t = "f" then
       DType.DFloat
     else
       DType.DString
+
+private constant typeSep : String := "^^"
+private constant colSep : String := "~~"
+private constant lineSep : String := "¨¨"
 
 private def toFloat (s : String) : Float := do
   let split := s.splitOn "."
@@ -181,6 +184,15 @@ private def toFloat (s : String) : Float := do
   else
     return -1.0 * (l.getLast!.toNat!.toFloat + rFloat)
 
+private def parseStringToEntry (dType : DType) (s : String) : Entry :=
+  if s ≠ "NULL" then
+    match dType with
+    | DType.DInt => s.toInt!
+    | DType.DFloat => toFloat s
+    | DType.DString => s
+  else
+    Entry.null
+
 private def parse (s : String) : Table := do
   if s.length = 0 then
     ⟨[], [], []⟩
@@ -188,11 +200,11 @@ private def parse (s : String) : Table := do
     let mut names : List String := []
     let mut dTypes : List DType := []
     let mut data : List Row := []
-    let lines : List String := s.splitOn "¨"
+    let lines : List String := s.splitOn lineSep
     let header : String := lines.head!
-    let headerParts : List String := header.splitOn "~"
+    let headerParts : List String := header.splitOn colSep
     for headerPart in headerParts do
-      let split : List String := headerPart.splitOn " "
+      let split : List String := headerPart.splitOn typeSep
       names := names.concat (split.head!)
       dTypes := dTypes.concat (dTypesMap (split.getLast!))
     let mut i : Nat := 0
@@ -200,13 +212,10 @@ private def parse (s : String) : Table := do
     for row in lines.tail! do
       let mut j : Nat := 0
       let mut rowData : List Entry := []
-      let rowSplit := row.splitOn "~"
+      let rowSplit := row.splitOn colSep
       for dType in dTypes do
         let valString : String := rowSplit.get! j
-        match dType with
-        | DType.DInt => rowData := rowData.concat (valString.toInt!)
-        | DType.DFloat => rowData := rowData.concat (toFloat valString)
-        | DType.DString => rowData := rowData.concat (valString)
+        rowData := rowData.concat (parseStringToEntry dType valString)
         j := j + 1
       data := data.concat rowData
       i := i + 1
@@ -231,22 +240,31 @@ def toString (t : Table) : String := do
     i := i + 1
   res
 
+instance : ToString Table where
+  toString t := t.toString
+
 end Table
 
 ---------------------
 
 constant MySQL : Type
 
+def kb (b : UInt64) : UInt64 := 1024 * b
+
+def mb (b : UInt64) : UInt64 := 1048576 * b
+
+def gb (b : UInt64) : UInt64 := 1073741824 * b
+
 namespace MySQL
 
 @[extern "lean_mysql_mk"]
-constant mk (bufferSizeKB : Nat := 8) : IO MySQL
+constant mk (bufferSize : UInt64 := kb 8) : IO MySQL
 
 @[extern "lean_mysql_set_buffer_size"]
-constant setBufferSizeMB (bufferSizeKB : Nat) : IO Unit
+constant setBufferSizeMB (bufferSize : UInt64) : IO Unit
 
 @[extern "lean_mysql_version"]
-constant version (m : MySQL) : BaseIO String
+constant version (m : MySQL) : String
 
 @[extern "lean_mysql_login"]
 constant login (m : MySQL) (h u p : String) : IO Unit

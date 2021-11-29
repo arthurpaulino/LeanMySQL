@@ -9,8 +9,6 @@
 #define l_arg b_lean_obj_arg
 #define l_res lean_obj_res
 
-const char* ERR_INCR_BFFR = "Not enough memory. Try increasing the buffer size.";
-
 typedef struct mysql {
     MYSQL* connection = NULL;
     char       logged = 0;
@@ -24,12 +22,27 @@ typedef struct mysql {
 
 static lean_external_class* g_mysql_external_class = NULL;
 
+static const char* ERR_NOT_LOGGED = "Not logged in.";
+static const char* ERR_ALRDY_LOGGED = "Already logged in. Try using 'close' first.";
+static const char* ERR_CANT_INIT = "Failed to instantiate a connection with MySQL.";
+static const char* ERR_NO_MEM = "Not enough memory to allocate buffer.";
+static const char* ERR_INCR_BFFR = "Not enough memory. Try increasing the buffer size.";
+
+static const char* INT = "i";
+static const char* FLOAT = "f";
+static const char* STRING = "s";
+static const char* NULL_ = "NULL";
+
+static const char* TYPE_SEP = "^^";
+static const char* COL_SEP = "~~";
+static const char* LINE_SEP = "¨¨";
+
 internal lean_object* mysql_box(mysql* m) {
     return lean_alloc_external(g_mysql_external_class, m);
 }
 
-internal mysql* mysql_unbox(lean_object* p) {
-    return (mysql*) (lean_get_external_data(p));
+internal mysql* mysql_unbox(lean_object* o) {
+    return (mysql*) (lean_get_external_data(o));
 }
 
 internal l_res make_error(const char* err_msg) {
@@ -72,23 +85,23 @@ internal char append_to_buffer(mysql* m, const char* s) {
 internal const char* type_to_str(int t) {
     switch (t) {
         case MYSQL_TYPE_TINY:
-            return "int";
+            return INT;
         case MYSQL_TYPE_SHORT:
-            return "int";
+            return INT;
         case MYSQL_TYPE_LONG:
-            return "int";
+            return INT;
         case MYSQL_TYPE_LONGLONG:
-            return "int";
+            return INT;
         case MYSQL_TYPE_INT24:
-            return "int";
+            return INT;
         case MYSQL_TYPE_DECIMAL:
-            return "float";
+            return FLOAT;
         case MYSQL_TYPE_FLOAT:
-            return "float";
+            return FLOAT;
         case MYSQL_TYPE_DOUBLE:
-            return "float";
+            return FLOAT;
         default:
-            return "string";
+            return STRING;
     }
 }
 
@@ -99,44 +112,42 @@ external l_res lean_mysql_initialize() {
     return lean_io_result_mk_ok(lean_box(0));
 }
 
-external l_res lean_mysql_mk(uint32_t b) {
+external l_res lean_mysql_mk(uint64_t b) {
     mysql* m = (mysql*) malloc(sizeof(mysql));
-    int size = (b - 1) * 1024;
-    char* buffer = (char*)malloc(size);
-    if (buffer == NULL) {
-        return make_error("Not enough memory to allocate buffer.");
+    char* buffer = (char*)malloc(b);
+    if (!buffer) {
+        return make_error(ERR_NO_MEM);
     }
     m->buffer = buffer;
-    m->buffer_size = size;
+    m->buffer_size = b;
     return lean_io_result_mk_ok(mysql_box(m));
 }
 
-external l_res lean_mysql_set_buffer_size(l_arg m_, uint32_t b) {
+external l_res lean_mysql_set_buffer_size(l_arg m_, uint64_t b) {
     mysql* m = mysql_unbox(m_);
-    int size = (b - 1) * 1024;
-    char* buffer = (char*)malloc(size);
-    if (buffer == NULL) {
-        return make_error("Not enough memory to allocate buffer.");
+    char* buffer = (char*)malloc(b);
+    if (!buffer) {
+        return make_error(ERR_NO_MEM);
     }
     free(m->buffer);
     m->buffer = buffer;
-    m->buffer_size = size;
+    m->buffer_size = b;
     return lean_io_result_mk_ok(lean_box(0));
 }
 
 external l_res lean_mysql_version() {
-    return lean_io_result_mk_ok(lean_mk_string(mysql_get_client_info()));
+    return lean_mk_string(mysql_get_client_info());
 }
 
 external l_res lean_mysql_login(l_arg m_, l_arg h_, l_arg u_, l_arg p_) {
     mysql* m = mysql_unbox(m_);
     if (m->logged) {
-        return make_error("Already logged in. Try using 'close' first.");
+        return make_error(ERR_ALRDY_LOGGED);
     }
 
     m->connection = mysql_init(NULL);
-    if (m->connection == NULL) {
-        return make_error("Failed to instantiate a connection with MySQL.");
+    if (!m->connection) {
+        return make_error(ERR_CANT_INIT);
     }
 
     const char* h = lean_string_cstr(h_);
@@ -148,7 +159,7 @@ external l_res lean_mysql_login(l_arg m_, l_arg h_, l_arg u_, l_arg p_) {
         NULL, 0, NULL, 0
     );
 
-    if (connection_ret == NULL) {
+    if (!connection_ret) {
         return make_error(mysql_error(m->connection));
     }
     else {
@@ -160,7 +171,7 @@ external l_res lean_mysql_login(l_arg m_, l_arg h_, l_arg u_, l_arg p_) {
 external l_res lean_mysql_run(l_arg m_, l_arg q_) {
     mysql* m = mysql_unbox(m_);
     if (!m->logged) {
-        return make_error("Not logged in.");
+        return make_error(ERR_NOT_LOGGED);
     }
 
     query(m, lean_string_cstr(q_));
@@ -173,7 +184,7 @@ external l_res lean_mysql_run(l_arg m_, l_arg q_) {
 external l_res lean_mysql_query(l_arg m_, l_arg q_) {
     mysql* m = mysql_unbox(m_);
     if (!m->logged) {
-        return make_error("Not logged in.");
+        return make_error(ERR_NOT_LOGGED);
     }
 
     query(m, lean_string_cstr(q_));
@@ -188,39 +199,41 @@ external l_res lean_mysql_query(l_arg m_, l_arg q_) {
     m->buffer_pos = 0;
     m->has_result = 0;
 
+    // encoding header
     for(int i = 0; i < num_fields; i++) {
         field = mysql_fetch_field(m->result);
         if (!append_to_buffer(m, field->name)) {
             return make_error(ERR_INCR_BFFR);
         }
-        if (!append_to_buffer(m, " ")) {
+        if (!append_to_buffer(m, TYPE_SEP)) {
             return make_error(ERR_INCR_BFFR);
         }
         if (!append_to_buffer(m, type_to_str(field->type))) {
             return make_error(ERR_INCR_BFFR);
         }
         if (i < num_fields - 1) {
-            if (!append_to_buffer(m, "~")) {
+            if (!append_to_buffer(m, COL_SEP)) {
                 return make_error(ERR_INCR_BFFR);
             }
         }
     }
-    if (!append_to_buffer(m, "¨")) {
+    if (!append_to_buffer(m, LINE_SEP)) {
         return make_error(ERR_INCR_BFFR);
     }
 
+    // encoding data
     while (row = mysql_fetch_row(m->result)) {
         for(int i = 0; i < num_fields; i++) {
-            if (!append_to_buffer(m, row[i] ? row[i] : "NULL")) {
+            if (!append_to_buffer(m, row[i] ? row[i] : NULL_)) {
                 return make_error(ERR_INCR_BFFR);
             }
             if (i < num_fields - 1) {
-                if (!append_to_buffer(m, "~")) {
+                if (!append_to_buffer(m, COL_SEP)) {
                     return make_error(ERR_INCR_BFFR);
                 }
             }
         }
-        if (!append_to_buffer(m, "¨")) {
+        if (!append_to_buffer(m, LINE_SEP)) {
             return make_error(ERR_INCR_BFFR);
         }
     }
