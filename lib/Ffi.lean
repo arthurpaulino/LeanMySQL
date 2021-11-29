@@ -20,6 +20,9 @@ instance : Coe String Entry where
 instance : Coe Float Entry where
   coe := Entry.float
 
+instance : OfScientific Entry where
+  ofScientific m s e := Entry.float (OfScientific.ofScientific m s e)
+
 abbrev Row := List Entry
 
 namespace Row
