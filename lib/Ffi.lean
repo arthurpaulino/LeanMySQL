@@ -23,16 +23,26 @@ instance : Coe Float Entry where
 instance : OfScientific Entry where
   ofScientific m s e := Entry.float (OfScientific.ofScientific m s e)
 
+namespace Entry
+
+protected def toString (e : Entry) : String := 
+match e with
+  | Entry.str e => s!"'{e}'"
+  | Entry.int e => toString e
+  | Entry.float e => toString e
+  | Entry.null => "NULL"
+
+instance : ToString Entry where
+  toString e := e.toString
+
+end Entry
+
 abbrev Row := List Entry
 
 namespace Row
 
 private def toStrings (r : Row) : List String :=
-r.map λ e => match e with
-  | Entry.str e => s!"'{e}'"
-  | Entry.int e => toString e
-  | Entry.float e => toString e
-  | Entry.null => "NULL"
+r.map Entry.toString
 
 private def build (r : Row) : String :=
 s!"({",".intercalate (r.toStrings)})"
@@ -56,13 +66,17 @@ abbrev TableScheme := List Column
 namespace TableScheme
 
 private def build (ts : TableScheme) : String :=
-s!"({",".intercalate (ts.map λ v => v.build)})"
+  s!"({",".intercalate (ts.map λ v => v.build)})"
 
 end TableScheme
 
---------------------------
-
 abbrev Col := Lean.Name
+
+namespace Col
+
+private def toString (c : Col) := Lean.Name.toString c
+
+end Col
 
 private inductive ColProp
   | EqE (c : Col) (e : Entry)
@@ -95,6 +109,30 @@ infix:50 " > " => ColProp.GC
 infix:25 " ∧ " => ColProp.And
 infix:25 " ∨ " => ColProp.Or
 
+namespace ColProp
+
+private def toString (cp : ColProp) : String :=
+match cp with
+| ColProp.EqE c e => s!"{c}={e}"
+| ColProp.NeqE c e => s!"{c}≠{e}"
+| ColProp.LeE c e => s!"{c}≤{e}"
+| ColProp.LE c e => s!"{c}<{e}"
+| ColProp.GeE c e => s!"{c}≥{e}"
+| ColProp.GE c e => s!"{c}>{e}"
+| ColProp.EqC c c' => s!"{c}={c'}"
+| ColProp.NeqC c c' => s!"{c}≠{c'}"
+| ColProp.LeC c c' => s!"{c}≤{c'}"
+| ColProp.LC c c' => s!"{c}<{c'}"
+| ColProp.GeC c c' => s!"{c}≥{c'}"
+| ColProp.GC c c' => s!"{c}>{c'}"
+| ColProp.And cp cp' => s!"({toString cp}) and ({toString cp'})"
+| ColProp.Or cp cp' => s!"({toString cp}) or ({toString cp'})"
+
+private instance : ToString ColProp where
+  toString cp := cp.toString
+
+end ColProp
+
 mutual
   inductive Query
     | mk (name : String) (steps : List QueryStep)
@@ -102,6 +140,7 @@ mutual
     | select (l : List Col)
     | filter (cp : ColProp)
     | join (q : Query) (on : ColProp) (how : String)
+    deriving Inhabited
 end
 
 def table (n : String) : Query := ⟨n, []⟩
@@ -129,31 +168,64 @@ private def transform (q : Query) (f : Query → Query) : Query := f q
 
 infixl:50 "↠" => transform
 
+private structure SQL where
+  Select : List String
+  From : String
+  Where : String
+  As : String
+
+namespace SQL
+
+private def init (t : String) (as : String) : SQL :=
+⟨[], t, "", as⟩
+
+private def toString (sql : SQL) : String :=
+let select := if sql.Select = [] then "*" else ",".intercalate sql.Select
+  if sql.Where ≠ "" then
+    if sql.As ≠ "" then
+      s!"(select {select} from {sql.From} where {sql.Where}) as {sql.As}"
+    else
+      s!"select {select} from {sql.From} where {sql.Where}"
+  else
+    if sql.As ≠ "" then
+      s!"(select {select} from {sql.From}) as {sql.As}"
+    else
+      s!"select {select} from {sql.From}"
+
+-- private def toString' (sql : SQL) : String :=
+
+end SQL
+
+private partial def applyStep (sql : SQL) (step : QueryStep) : SQL :=
+match step with
+| QueryStep.select l =>
+  let newList := l.map Col.toString
+  if sql.Select = [] then
+    ⟨newList, sql.From, sql.Where, sql.As⟩
+  else
+    ⟨sql.Select.filter (λ s => newList.contains s), sql.From, sql.Where, sql.As⟩
+| QueryStep.filter cp =>
+  let newWhere := if sql.Where ≠ "" then s!"({sql.Where}) and ({cp})" else cp.toString
+  ⟨sql.Select, sql.From, newWhere, sql.As⟩
+| QueryStep.join q on how =>
+  let newSQL := q.steps.foldl applyStep (SQL.init q.name q.name)
+  let newFrom := s!"{sql.toString} {how} join {newSQL.toString} on {on}"
+  ⟨[], newFrom, "", "joined"⟩
+
 namespace Query
 
-/-
-#todo
-Find a way to transform a Query like
-
-```
-table "cars" ↠
-select [`id, `name] ↠
-join (table "prices") (`l.id = `r.id) "left" ↠
-filter (`price = 2)
-```
-
-into:
-
-```
-select *
-from (select id,name from car) as l left join (select * from price) as r on l.id=r.id
-where price = 2;
-```
-private def build (q : Query) : String := sorry
--/
+private def build (q : Query) : String :=
+"select * from " ++ (SQL.toString (q.steps.foldl applyStep (SQL.init q.name q.name)))
 
 end Query
 
+#eval (table "person"
+  ↠ select [`age, `job_id]
+  -- ↠ join (table "job") (`person.job_id = `job.id) "left"
+  ↠ filter (`age > 20)
+  -- ↠ join (table "person") (`person.id = `person.id) "inner"
+  ).build
+#exit
 private inductive DType | DInt | DFloat | DString
 
 structure Table where
@@ -165,36 +237,36 @@ structure Table where
 namespace Table
 
 private def dTypesMap (t : String) : DType :=
-  if t = "i" then
-    DType.DInt
+if t = "i" then
+  DType.DInt
+else
+  if t = "f" then
+    DType.DFloat
   else
-    if t = "f" then
-      DType.DFloat
-    else
-      DType.DString
+    DType.DString
 
 private constant typeSep : String := "^^"
 private constant colSep : String := "~~"
 private constant lineSep : String := "¨¨"
 
-private def toFloat (s : String) : Float := do
-  let split := s.splitOn "."
-  let l := split.head!.splitOn "-"
-  let r := split.getLast!
-  let rFloat := r.toNat!.toFloat / (10.0 ^ r.length.toFloat)
-  if l.length = 1 then
-    return l.head!.toNat!.toFloat + rFloat
-  else
-    return -1.0 * (l.getLast!.toNat!.toFloat + rFloat)
+private def toFloat (s : String) : Float :=
+let split := s.splitOn "."
+let l := split.head!.splitOn "-"
+let r := split.getLast!
+let rFloat := r.toNat!.toFloat / (10.0 ^ r.length.toFloat)
+if l.length = 1 then
+  return l.head!.toNat!.toFloat + rFloat
+else
+  return -1.0 * (l.getLast!.toNat!.toFloat + rFloat)
 
 private def parseStringToEntry (dType : DType) (s : String) : Entry :=
-  if s ≠ "NULL" then
-    match dType with
-    | DType.DInt => s.toInt!
-    | DType.DFloat => toFloat s
-    | DType.DString => s
-  else
-    Entry.null
+if s ≠ "NULL" then
+  match dType with
+  | DType.DInt => s.toInt!
+  | DType.DFloat => toFloat s
+  | DType.DString => s
+else
+  Entry.null
 
 private def parse (s : String) : Table := do
   if s.length = 0 then
@@ -248,8 +320,6 @@ instance : ToString Table where
 
 end Table
 
----------------------
-
 constant MySQL : Type
 
 def kb (b : UInt64) : UInt64 := 1024 * b
@@ -293,18 +363,12 @@ m.run ("drop table " ++ n)
 def insertIntoTable (m : MySQL) (n : String) (r : Row) : IO Unit :=
 m.run s!"insert into {n} values{r.build}"
 
------- querying
-
 @[extern "lean_mysql_query"]
 private constant querySQLPriv (m : MySQL) (q : String) : IO Unit
 
 def querySQL (m : MySQL) (q : String) : IO Unit := m.querySQLPriv q
 
-/-# todo
-  constant query (m : MySQL) (q : Query) : IO Unit := m.querySQL q.build
--/
-
------- extract query result
+constant query (m : MySQL) (q : Query) : IO Unit := m.querySQL q.build
 
 @[extern "lean_mysql_get_query_result"]
 private constant getQueryResultPriv (m : MySQL) : String
