@@ -196,6 +196,10 @@ let select := if sql.Select = [] then "*" else ",".intercalate sql.Select
 
 end SQL
 
+private inductive SQL'
+| regular
+| joined
+
 private partial def applyStep (sql : SQL) (step : QueryStep) : SQL :=
 match step with
 | QueryStep.select l =>
@@ -210,7 +214,7 @@ match step with
 | QueryStep.join q on how =>
   let newSQL := q.steps.foldl applyStep (SQL.init q.name q.name)
   let newFrom := s!"{sql.toString} {how} join {newSQL.toString} on {on}"
-  ⟨[], newFrom, "", "joined"⟩
+  ⟨[], newFrom, "", s!"{sql.As}_{how}_join_{newSQL.As}"⟩
 
 namespace Query
 
@@ -220,12 +224,13 @@ private def build (q : Query) : String :=
 end Query
 
 #eval (table "person"
-  ↠ select [`age, `job_id]
-  -- ↠ join (table "job") (`person.job_id = `job.id) "left"
-  ↠ filter (`age > 20)
-  -- ↠ join (table "person") (`person.id = `person.id) "inner"
+  ↠ select [`name, `age, `job_id, `country_id]
+  ↠ join (table "job") (`job_id = `job.id) "left"
+  -- ↠ filter (`age > 20)
+  ↠ select [`name, `age, `job_name, `country_id]
+  ↠ join (table "country") (`country_id = `country.id) "inner"
   ).build
-#exit
+
 private inductive DType | DInt | DFloat | DString
 
 structure Table where
