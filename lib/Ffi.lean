@@ -1,109 +1,9 @@
+import DataFrame
+
 @[extern "lean_mysql_initialize"]
 constant initMySQL : BaseIO Unit
 
 builtin_initialize initMySQL
-
-inductive Entry
-  | str (s : String)
-  | int (n : Int)
-  | float (f : Float)
-  | null
-
-constant NULL : Entry := Entry.null
-
-instance : Coe Int Entry where
-  coe := Entry.int
-
-instance : Coe String Entry where
-  coe := Entry.str
-
-instance : Coe Float Entry where
-  coe := Entry.float
-
-instance : OfScientific Entry where
-  ofScientific m s e := Entry.float (OfScientific.ofScientific m s e)
-
-namespace List
-
-def reversed : List α → List α
-  | nil      => nil
-  | cons h t => (reversed t).concat h
-
-end List
-
-namespace String
-
-def withoutRightmostZeros (s : String) : String := do
-  if s = "" then
-    s
-  else
-    let data := s.data
-    let mut rangeList : List Nat := []
-    for i in [0 : data.length] do
-      rangeList := rangeList.concat i
-    for i in rangeList.reversed do
-      if i = 0 then
-        return ""
-      if (data.get! i) ≠ '0' then
-        let sub : Substring := ⟨s, 0, i + 1⟩
-        return sub.toString
-    s
-
-def optimizeFloatString (s : String) : String :=
-  let split := s.splitOn "."
-  let cleanL := split.getLast!.withoutRightmostZeros
-  split.head! ++ "." ++ (if cleanL = "" then "0" else cleanL)
-
-end String
-
-namespace Entry
-
-protected def toString (e : Entry) : String := 
-  match e with
-  | Entry.str e => s!"'{e}'"
-  | Entry.int e => toString e
-  | Entry.float e => (toString e).optimizeFloatString
-  | Entry.null => "NULL"
-
-instance : ToString Entry where
-  toString e := e.toString
-
-end Entry
-
-abbrev Row := List Entry
-
-namespace Row
-
-def toStrings (r : Row) : List String :=
-  r.map Entry.toString
-
-def build (r : Row) : String :=
-  s!"({",".intercalate (r.toStrings)})"
-
-end Row
-
-structure Column where
-  name : String
-  type : String
-  deriving Inhabited
-
-namespace Column
-
-def build (c : Column) : String :=
-  s!"{c.name} {c.type}"
-
-end Column
-
-abbrev TableScheme := List Column
-
-namespace TableScheme
-
-def build (ts : TableScheme) : String :=
-  s!"({",".intercalate (ts.map λ v => v.build)})"
-
-end TableScheme
-
-inductive DType | DInt | DFloat | DString
 
 namespace String
 
@@ -132,7 +32,6 @@ def toDType! (t : String) : DType :=
     else
       DType.DString
 
-
 def toEntry! (s : String) (dType : DType) : Entry :=
   if s ≠ "NULL" then
     match dType with
@@ -144,38 +43,28 @@ def toEntry! (s : String) (dType : DType) : Entry :=
 
 end String
 
-structure Table where
-  names : List String
-  types : List DType
-  rows : List Row
-  deriving Inhabited
+namespace DataFrame
 
-namespace Table
-
-def parse (s : String) : Table := do
+def fromString (s : String) : DataFrame := do
   if s.length = 0 then
-    ⟨[], [], []⟩
+    ⟨[], []⟩
   else
     let typeSep : String := "^^"
     let colSep : String := "~~"
     let lineSep : String := "¨¨"
-    let mut names : List String := []
-    let mut dTypes : List DType := []
+    let mut header : Header := []
     let mut data : List Row := []
     let lines : List String := s.splitOn lineSep
-    let header : String := lines.head!
-    let headerParts : List String := header.splitOn colSep
-    for headerPart in headerParts do
+    for headerPart in lines.head!.splitOn colSep do
       let split : List String := headerPart.splitOn typeSep
-      names := names.concat (split.head!)
-      dTypes := dTypes.concat (split.getLast!.toDType!)
+      header := header.concat (split.head!, split.getLast!.toDType!)
     let mut i : Nat := 0
     let maxI : Nat := lines.tail!.length
     for row in lines.tail! do
       let mut j : Nat := 0
       let mut rowData : List Entry := []
       let rowSplit := row.splitOn colSep
-      for dType in dTypes do
+      for dType in header.map λ h => h.2 do
         let valString : String := rowSplit.get! j
         rowData := rowData.concat (valString.toEntry! dType)
         j := j + 1
@@ -183,29 +72,27 @@ def parse (s : String) : Table := do
       i := i + 1
       if i = maxI - 1 then
         break
-    ⟨names, dTypes, data⟩
+    ⟨header, data⟩
 
-def toString (t : Table) : String := do
-  let mut res : String := ""
-  for n in t.names do
-    res := res ++ n ++ "|"
-  res := res ++ "\n"
-  let mut i : Nat := 0
-  let maxI : Nat := t.rows.length
-  for row in t.rows do
-    let rowStrings := row.toStrings
-    for s in rowStrings do
-      res := res ++ s ++ "|"
-    if i = maxI - 1 then
-      break
-    res := res ++ "\n"
-    i := i + 1
-  res
+end DataFrame
 
-instance : ToString Table where
-  toString t := t.toString
+abbrev MySQLColumn := String × String
 
-end Table
+namespace MySQLColumn
+
+def build (c : MySQLColumn) : String :=
+  s!"{c.1} {c.2}"
+
+end MySQLColumn
+
+abbrev MySQLScheme := List MySQLColumn
+
+namespace MySQLScheme
+
+def build (ts : MySQLScheme) : String :=
+  s!"({",".intercalate (ts.map λ v => v.build)})"
+
+end MySQLScheme
 
 constant MySQL : Type
 
@@ -241,7 +128,7 @@ def dropDB (m : MySQL) (d : String) : IO Unit :=
 def useDB (m : MySQL) (d : String) : IO Unit :=
   m.run ("use " ++ d)
 
-def createTable (m : MySQL) (n : String) (ts : TableScheme) : IO Unit :=
+def createTable (m : MySQL) (n : String) (ts : MySQLScheme) : IO Unit :=
   m.run ("create table " ++ (n ++ ts.build))
 
 def dropTable (m : MySQL) (n : String) : IO Unit :=
@@ -254,10 +141,10 @@ def insertIntoTable (m : MySQL) (n : String) (r : Row) : IO Unit :=
 constant query (m : MySQL) (q : String) : IO Unit
 
 @[extern "lean_mysql_get_query_result"]
-constant getQueryResultRaw (m : MySQL) : String
+constant getQueryResultBuffer (m : MySQL) : String
 
-def getQueryResult (m : MySQL) : Table :=
-  Table.parse (getQueryResultRaw m)
+def getQueryResult (m : MySQL) : DataFrame :=
+  DataFrame.fromString (getQueryResultBuffer m)
 
 @[extern "lean_mysql_close"]
 constant close (m : MySQL) : BaseIO Unit

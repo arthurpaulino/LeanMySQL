@@ -8,27 +8,27 @@ def main : IO Unit := do
   mysql.useDB "test_db"
 
   -- mysql.createTable "job" [
-  --   ⟨"id", "INT PRIMARY KEY"⟩,
-  --   ⟨"job_name", "VARCHAR(255)"⟩
+  --   ("id", "INT PRIMARY KEY"),
+  --   ("job_name", "VARCHAR(255)")
   -- ]
   -- mysql.insertIntoTable "job" [1, "Computer Scientist"]
   -- mysql.insertIntoTable "job" [2, "Mathematician"]
 
   -- mysql.createTable "country" [
-  --   ⟨"id", "INT PRIMARY KEY"⟩,
-  --   ⟨"job_name", "VARCHAR(255)"⟩
+  --   ("id", "INT PRIMARY KEY"),
+  --   ("job_name", "VARCHAR(255)")
   -- ]
   -- mysql.insertIntoTable "country" [1, "Brazil"]
   -- mysql.insertIntoTable "country" [2, "USA"]
   -- mysql.insertIntoTable "country" [3, "German"]
 
   -- mysql.createTable "person" [
-  --     ⟨"id", "INT PRIMARY KEY"⟩,
-  --     ⟨"name", "VARCHAR(255)"⟩,
-  --     ⟨"age", "INT"⟩,
-  --     ⟨"height", "FLOAT"⟩,
-  --     ⟨"job_id", "INT"⟩,
-  --     ⟨"country_id", "INT"⟩
+  --     ("id", "INT PRIMARY KEY"),
+  --     ("name", "VARCHAR(255)"),
+  --     ("age", "INT"),
+  --     ("height", "FLOAT"),
+  --     ("job_id", "INT"),
+  --     ("country_id", "INT")
   --   ]
   -- mysql.insertIntoTable "person" [1, "Alice", 20, 1.72, 1, 1]
   -- mysql.insertIntoTable "person" [2, "Bob", 21, 1.64, 2, 3]
