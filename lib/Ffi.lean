@@ -47,7 +47,7 @@ namespace DataFrame
 
 def fromString (s : String) : DataFrame := do
   if s.length = 0 then
-    ⟨[], []⟩
+    DataFrame.empty
   else
     let typeSep : String := "^^"
     let colSep : String := "~~"
@@ -56,7 +56,7 @@ def fromString (s : String) : DataFrame := do
     let mut header : Header := []
     for headerPart in lines.head!.splitOn colSep do
       let split : List String := headerPart.splitOn typeSep
-      header := header.concat (split.head!, split.getLast!.toDType!)
+      header := header.concat (ColName.fromString split.head!, split.getLast!.toDType!)
     let maxI : Nat := lines.tail!.length
     let mut data : List Row := []
     for row in lines.tail! do
