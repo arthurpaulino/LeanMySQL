@@ -72,21 +72,12 @@ def fromString (s : String) : DataFrame := do
 
 end DataFrame
 
-abbrev MySQLColumn := String × String
-
-namespace MySQLColumn
-
-def build (c : MySQLColumn) : String :=
-  s!"{c.1} {c.2}"
-
-end MySQLColumn
-
-abbrev MySQLScheme := List MySQLColumn
+abbrev MySQLScheme := List (String × String)
 
 namespace MySQLScheme
 
 def build (ts : MySQLScheme) : String :=
-  s!"({",".intercalate (ts.map λ v => v.build)})"
+  s!"({",".intercalate (ts.map λ v => " ".intercalate [v.1, v.2])})"
 
 end MySQLScheme
 

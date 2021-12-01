@@ -148,4 +148,6 @@ def toString (df : DataFrame) : String := do
 instance : ToString DataFrame where
   toString df := df.toString
 
+def transform (df : DataFrame) (f : DataFrame → DataFrame) : DataFrame := f df
+
 end DataFrame
