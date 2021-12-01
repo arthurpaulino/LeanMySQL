@@ -52,14 +52,13 @@ def fromString (s : String) : DataFrame := do
     let typeSep : String := "^^"
     let colSep : String := "~~"
     let lineSep : String := "¨¨"
-    let mut header : Header := []
-    let mut data : List Row := []
     let lines : List String := s.splitOn lineSep
+    let mut header : Header := []
     for headerPart in lines.head!.splitOn colSep do
       let split : List String := headerPart.splitOn typeSep
       header := header.concat (split.head!, split.getLast!.toDType!)
-    let mut i : Nat := 0
     let maxI : Nat := lines.tail!.length
+    let mut data : List Row := []
     for row in lines.tail! do
       let mut j : Nat := 0
       let mut rowData : List Entry := []
@@ -69,9 +68,6 @@ def fromString (s : String) : DataFrame := do
         rowData := rowData.concat (valString.toEntry! dType)
         j := j + 1
       data := data.concat rowData
-      i := i + 1
-      if i = maxI - 1 then
-        break
     ⟨header, data⟩
 
 end DataFrame

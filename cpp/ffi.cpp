@@ -192,15 +192,14 @@ external l_res lean_mysql_query(l_arg m_, l_arg q_) {
         return make_error(mysql_error(m->connection));
     }
 
-    int num_fields = mysql_num_fields(m->result);
-    MYSQL_FIELD* field;
-    MYSQL_ROW row;
-
     m->buffer_pos = 0;
     m->has_result = 0;
 
     // encoding header
-    for(int i = 0; i < num_fields; i++) {
+    int num_fields = mysql_num_fields(m->result);
+    MYSQL_FIELD* field;
+
+    for(int j = 0; j < num_fields; j++) {
         field = mysql_fetch_field(m->result);
         if (!append_to_buffer(m, field->name)) {
             return make_error(ERR_INCR_BFFR);
@@ -211,7 +210,7 @@ external l_res lean_mysql_query(l_arg m_, l_arg q_) {
         if (!append_to_buffer(m, type_to_str(field->type))) {
             return make_error(ERR_INCR_BFFR);
         }
-        if (i < num_fields - 1) {
+        if (j < num_fields - 1) {
             if (!append_to_buffer(m, COL_SEP)) {
                 return make_error(ERR_INCR_BFFR);
             }
@@ -222,19 +221,25 @@ external l_res lean_mysql_query(l_arg m_, l_arg q_) {
     }
 
     // encoding data
-    while (row = mysql_fetch_row(m->result)) {
-        for(int i = 0; i < num_fields; i++) {
-            if (!append_to_buffer(m, row[i] ? row[i] : NULL_)) {
+    int num_rows = mysql_num_rows(m->result);
+    MYSQL_ROW row;
+
+    for (int i = 0; i < num_rows; i++) {
+        row = mysql_fetch_row(m->result);
+        for(int j = 0; j < num_fields; j++) {
+            if (!append_to_buffer(m, row[j] ? row[j] : NULL_)) {
                 return make_error(ERR_INCR_BFFR);
             }
-            if (i < num_fields - 1) {
+            if (j < num_fields - 1) {
                 if (!append_to_buffer(m, COL_SEP)) {
                     return make_error(ERR_INCR_BFFR);
                 }
             }
         }
-        if (!append_to_buffer(m, LINE_SEP)) {
-            return make_error(ERR_INCR_BFFR);
+        if (i < num_rows - 1) {
+            if (!append_to_buffer(m, LINE_SEP)) {
+                return make_error(ERR_INCR_BFFR);
+            }
         }
     }
 
