@@ -6,6 +6,14 @@ def reversed : List α → List α
 
 end List
 
+namespace Int
+
+def toFloat : Int → Float
+  | ofNat n   => n.toFloat
+  | negSucc n => -n.toFloat - 1
+
+end Int
+
 namespace String
 
 def withoutRightmostZeros (s : String) : String := do
@@ -32,7 +40,7 @@ def optimizeFloatString (s : String) : String :=
   else
     if length = 2 then
       let cleanR := split.getLast!.withoutRightmostZeros
-      split.head! ++ "." ++ (if cleanR = "" then "0" else cleanR)
+      split.head! ++ "." ++ (if cleanR.isEmpty then "0" else cleanR)
     else
       panic! "ill-formed float string"
 
@@ -45,10 +53,11 @@ def leftFillWithUntil (s : String) (f : Char) (n : Nat) : String := do
 end String
 
 inductive Entry
-| int (n : Int)
-| float (f : Float)
-| str (s : String)
-| null
+  | int (n : Int)
+  | float (f : Float)
+  | str (s : String)
+  | null
+  deriving Inhabited
 
 constant NULL : Entry := Entry.null
 
@@ -102,154 +111,199 @@ def length (c : ColName) : Nat := c.toString.length
 
 def fromString (s : String) : ColName := Lean.Name.mkSimple s
 
+instance : Coe String ColName where
+  coe := ColName.fromString
+
 end ColName
 
-private inductive ColProp
-  | EqE (c : ColName) (e : Entry)
-  | NeqE (c : ColName) (e : Entry)
-  | LeE (c : ColName) (e : Entry)
-  | LE (c : ColName) (e : Entry)
-  | GeE (c : ColName) (e : Entry)
-  | GE (c : ColName) (e : Entry)
-  | EqC (c : ColName) (c' : ColName)
-  | NeqC (c : ColName) (c' : ColName)
-  | LeC (c : ColName) (c' : ColName)
-  | LC (c : ColName) (c' : ColName)
-  | GeC (c : ColName) (c' : ColName)
-  | GC (c : ColName) (c' : ColName)
-  | And (cp : ColProp) (cp' : ColProp)
-  | Or (cp : ColProp) (cp' : ColProp)
-
-namespace ColProp
-
-declare_syntax_cat entry
-
-syntax "#" noWs "{" term "}" : entry
-
-syntax num : entry
-syntax "-" noWs num : entry
-syntax str : entry
-syntax "NULL" : entry
-
-macro "entry% " stx:entry : term =>
-  match stx with
-  | `(entry| #{$v}) => `(coe $v)
-  | `(entry| $v:numLit) => `(Entry.int $v)
-  | `(entry| -$v:numLit) => `(Entry.int (-$v))
-  | `(entry| $v:strLit) => `(Entry.str $v)
-  | `(entry| NULL) => `(Entry.null)
-  | _ => Macro.throwErrorAt stx "ill-formed entry"
-
-declare_syntax_cat colProp
-
-syntax:50 ident " = " entry : colProp
-syntax:50 ident " ≠ " entry : colProp
-syntax:50 ident " ≤ " entry : colProp
-syntax:50 ident " < " entry : colProp
-syntax:50 ident " ≥ " entry : colProp
-syntax:50 ident " > " entry : colProp
-syntax:50 ident " = " ident : colProp
-syntax:50 ident " ≠ " ident : colProp
-syntax:50 ident " ≤ " ident : colProp
-syntax:50 ident " < " ident : colProp
-syntax:50 ident " ≥ " ident : colProp
-syntax:50 ident " > " ident : colProp
-syntax:25 colProp:26 " ∧ " colProp:26 : colProp
-syntax:25 colProp:26 " ∨ " colProp:26 : colProp
-syntax:max "(" colProp ")" : colProp
-
-syntax "colProp% " colProp : term
-
-macro_rules
-| `(colProp% $stx) =>
-  match stx with
-  | `(colProp| $x:ident = $y:entry) => `(ColProp.EqE $(quote x.getId) (entry% $y))
-  | `(colProp| $x:ident ≠ $y:entry) => `(ColProp.NeE $(quote x.getId) (entry% $y))
-  | `(colProp| $x:ident ≤ $y:entry) => `(ColProp.LeE $(quote x.getId) (entry% $y))
-  | `(colProp| $x:ident < $y:entry) => `(ColProp.LE  $(quote x.getId) (entry% $y))
-  | `(colProp| $x:ident ≥ $y:entry) => `(ColProp.GeE $(quote x.getId) (entry% $y))
-  | `(colProp| $x:ident > $y:entry) => `(ColProp.GE  $(quote x.getId) (entry% $y))
-  | `(colProp| $x:ident = $y:ident) => `(ColProp.EqC $(quote x.getId) $(quote y.getId))
-  | `(colProp| $x:ident ≠ $y:ident) => `(ColProp.NeC $(quote x.getId) $(quote y.getId))
-  | `(colProp| $x:ident ≤ $y:ident) => `(ColProp.LeC $(quote x.getId) $(quote y.getId))
-  | `(colProp| $x:ident < $y:ident) => `(ColProp.LC  $(quote x.getId) $(quote y.getId))
-  | `(colProp| $x:ident ≥ $y:ident) => `(ColProp.GeC $(quote x.getId) $(quote y.getId))
-  | `(colProp| $x:ident > $y:ident) => `(ColProp.GC  $(quote x.getId) $(quote y.getId))
-  | `(colProp| $x ∧ $y) => `(ColProp.And (colProp% $x) (colProp% $y))
-  | `(colProp| $x ∨ $y) => `(ColProp.Or  (colProp% $x) (colProp% $y))
-  | `(colProp| ($x)) => `(colProp% $x)
-  | _ => Macro.throwErrorAt stx "ill-formed column proposition"
-
-end ColProp
-
 inductive DType
-| DInt
-| DFloat
-| DString
+  | DInt
+  | DFloat
+  | DString
+  | DAny
+  deriving Inhabited, DecidableEq
+
+namespace Entry
+
+def toDType (e : Entry) : DType :=
+  match e with
+  | Entry.int e => DType.DInt
+  | Entry.float e => DType.DFloat
+  | Entry.str e => DType.DString
+  | Entry.null => DType.DAny
+
+def toFloatEntryIfIntEntry (e : Entry) : Entry :=
+  match e with
+  | Entry.int e => e.toFloat
+  | _ => e
+
+end Entry
 
 abbrev Header := List (ColName × DType)
+
+namespace Header
+
+def colNames (header : Header) : List ColName :=
+  header.map λ h => h.1
+
+def colTypes (header : Header) : List DType :=
+  header.map λ h => h.2
+
+end Header
+
+abbrev Col := List Entry
 
 structure DataFrame where
   header : Header
   rows : List Row
+  deriving Inhabited
 
 namespace DataFrame
 
-def empty : DataFrame := ⟨[], []⟩
+constant empty : DataFrame := ⟨[], []⟩
+
+def setHeader (df : DataFrame) (header : Header) : DataFrame := do
+  if df.rows.isEmpty then
+    ⟨header, df.rows⟩
+  else
+    if df.header.length ≠ header.length then
+      panic! "inconsistent header length"
+    let mut invalidItems : List (ColName × ColName) := []
+    for ((dfColName, dfDType), (colName, dType)) in df.header.zip header do
+      if dfDType ≠ DType.DAny ∧ dfDType ≠ dType then
+        invalidItems := invalidItems.concat (dfColName, colName)
+    if ¬invalidItems.isEmpty then
+      panic! s!"inconsistent types for old columns {invalidItems.map λ i => i.1} " ++
+        s!"and new columns {invalidItems.map λ i => i.2}"
+    else
+      ⟨header, df.rows⟩
+
+def addRow (df : DataFrame) (row : Row) : DataFrame := do
+  if df.header.length ≠ row.length then
+    panic! "inconsistent row size"
+  let mut invalidItems : List (ColName × Entry) := []
+  let mut newRow : Row := []
+  for ((dfColName, dfDType), e) in df.header.zip row do
+    let eDType := e.toDType
+    if dfDType = eDType ∨ [dfDType, eDType].contains DType.DAny then
+      newRow := newRow.concat e
+    else
+      if eDType = DType.DInt ∧ dfDType = DType.DFloat then
+        newRow := newRow.concat e.toFloatEntryIfIntEntry
+      else
+        invalidItems := invalidItems.concat (dfColName, e)
+  if ¬invalidItems.isEmpty then
+    panic! s!"inconsistent types for old columns {invalidItems.map λ i => i.1} " ++
+      s!"and entries {invalidItems.map λ i => i.2}"
+  else
+    ⟨df.header, df.rows.concat newRow⟩
+
+
+def addRows (df : DataFrame) (rows : List Row) : DataFrame := do
+  let mut df : DataFrame := df
+  for row in rows do
+    df := df.addRow row
+  df
+
+def new (colNames : List ColName) (colTypes : List DType) (rows : List Row := []) : DataFrame :=
+  if colNames.length ≠ colTypes.length then
+    panic! "columns names and types of different lengths"
+  else
+    (DataFrame.empty.setHeader (colNames.zip colTypes)).addRows rows
+
+def nRows (df : DataFrame) : Nat :=
+  df.rows.length
+
+def nCols (df : DataFrame) : Nat :=
+  df.header.length
 
 def shape (df : DataFrame) : Nat × Nat :=
-  (df.rows.length, df.header.length)
+  (df.nRows, df.nCols)
 
 def colNames (df : DataFrame) : List ColName :=
-  df.header.map λ h => h.1
+  df.header.colNames
 
 def colTypes (df : DataFrame) : List DType :=
-  df.header.map λ h => h.2
+  df.header.colTypes
+
+def row! (df : DataFrame) (i : Nat) : Row :=
+  if i >= df.rows.length then
+    panic! s!"invalid index {i}"
+  else
+    (df.rows.get! i)
+
+def rows! (df : DataFrame) (li : List Nat) : List Row := do
+  let mut invalidIndexes : List Nat := []
+  for i in li do
+    if i >= df.rows.length then
+      invalidIndexes := invalidIndexes.concat i
+  if ¬invalidIndexes.isEmpty then
+    panic! s!"invalid indexes {invalidIndexes}"
+  else
+    li.map λ i => df.row! i
+
+def col! (df : DataFrame) (j : Nat) : Col :=
+  if j >= df.header.length then
+    panic! s!"invalid index {j}"
+  else
+    df.rows.map λ r => r.get! j
+
+def cols! (df : DataFrame) (lj : List Nat) : List Col := do
+  let mut invalidIndexes : List Nat := []
+  for j in lj do
+    if j >= df.header.length then
+      invalidIndexes := invalidIndexes.concat j
+  if ¬invalidIndexes.isEmpty then
+    panic! s!"invalid indexes {invalidIndexes}"
+  else
+    lj.map λ j => df.col! j
+
+def at! (df : DataFrame) (i j : Nat) : Entry :=
+  if i >= df.rows.length then
+    panic! s!"invalid row index {i}"
+  else
+    if j >= df.header.length then
+      panic! s!"invalid column index {j}"
+    else
+      (df.row! i).get! j
 
 def toString (df : DataFrame) : String := do
-  let mut cells : List (List String) := []
-  let mut colLengths : List Nat := []
-  let mut header : List ColName := []
-  for colName in df.colNames do
-    colLengths := colLengths.concat colName.length
-    header := header.concat colName
-  cells := cells.concat (header.map ColName.toString)
-  for row in df.rows do
-    let mut line : List String := []
-    let rowStrings : List String := row.toStrings
-    for j in [0 : rowStrings.length] do
-      let s := rowStrings.get! j
-      let s_length : Nat := s.length
-      if s_length > (colLengths.get! j) then
-        colLengths := colLengths.set j s_length
-      line := line.concat s
-    cells := cells.concat line
-  let mut res : String := ""
-  for i in [0 : cells.length] do
-    let row := cells.get! i
-    for j in [0 : row.length] do
-      let val : String := row.get! j
-      res := res ++ "|" ++ (val.leftFillWithUntil ' ' (colLengths.get! j))
-    res := res ++ "|"
-    if i < cells.length - 1 then
-      res := res ++ "\n"
-    if i = 0 then
+  if df.nCols = 0 then
+    ""
+  else
+    let mut cells : List (List String) := []
+    let mut colLengths : List Nat := []
+    let mut header : List ColName := []
+    for colName in df.colNames do
+      colLengths := colLengths.concat colName.length
+      header := header.concat colName
+    cells := cells.concat (header.map ColName.toString)
+    for row in df.rows do
+      let mut line : List String := []
+      let rowStrings : List String := row.toStrings
+      for j in [0 : rowStrings.length] do
+        let s := rowStrings.get! j
+        let s_length : Nat := s.length
+        if s_length > (colLengths.get! j) then
+          colLengths := colLengths.set j s_length
+        line := line.concat s
+      cells := cells.concat line
+    let mut res : String := ""
+    for i in [0 : cells.length] do
+      let row := cells.get! i
       for j in [0 : row.length] do
-        res := res ++ "|" ++ "".leftFillWithUntil '-' (colLengths.get! j)
-      res := res ++ "|\n"
-  res
+        let val : String := row.get! j
+        res := res ++ "|" ++ (val.leftFillWithUntil ' ' (colLengths.get! j))
+      res := res ++ "|"
+      if cells.length = 1 ∨ i < cells.length - 1 then
+        res := res ++ "\n"
+      if i = 0 then
+        for j in [0 : row.length] do
+          res := res ++ "|" ++ "".leftFillWithUntil '-' (colLengths.get! j)
+        res := res ++ "|\n"
+    res
 
 instance : ToString DataFrame where
   toString df := df.toString
-
-def transform (df : DataFrame) (f : DataFrame → DataFrame) : DataFrame := f df
-
-def filter (df : DataFrame) (cp : ColProp) : DataFrame := sorry
-
-#check DataFrame.empty.filter (colProp% a = 2)
--- filter empty (ColProp.EqE `a (Entry.int 2)) : DataFrame
-
--- def select (df : DataFrame) : DataFrame :=
-
 
 end DataFrame

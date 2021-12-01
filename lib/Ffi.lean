@@ -38,6 +38,7 @@ def toEntry! (s : String) (dType : DType) : Entry :=
     | DType.DInt => s.toInt!
     | DType.DFloat => s.toFloat!
     | DType.DString => s
+    | DType.DAny => s
   else
     Entry.null
 
@@ -46,7 +47,7 @@ end String
 namespace DataFrame
 
 def fromString (s : String) : DataFrame := do
-  if s.length = 0 then
+  if s.isEmpty then
     DataFrame.empty
   else
     let typeSep : String := "^^"
@@ -56,9 +57,8 @@ def fromString (s : String) : DataFrame := do
     let mut header : Header := []
     for headerPart in lines.head!.splitOn colSep do
       let split : List String := headerPart.splitOn typeSep
-      header := header.concat (ColName.fromString split.head!, split.getLast!.toDType!)
-    let maxI : Nat := lines.tail!.length
-    let mut data : List Row := []
+      header := header.concat (split.head!, split.getLast!.toDType!)
+    let mut rows : List Row := []
     for row in lines.tail! do
       let mut j : Nat := 0
       let mut rowData : List Entry := []
@@ -67,8 +67,8 @@ def fromString (s : String) : DataFrame := do
         let valString : String := rowSplit.get! j
         rowData := rowData.concat (valString.toEntry! dType)
         j := j + 1
-      data := data.concat rowData
-    ⟨header, data⟩
+      rows := rows.concat rowData
+    (DataFrame.empty.setHeader header).addRows rows
 
 end DataFrame
 
