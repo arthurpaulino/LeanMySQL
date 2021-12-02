@@ -24,7 +24,7 @@ def cLibTarget (pkgDir : FilePath) : FileTarget :=
 
 package LeanMySQL (pkgDir) {
   srcDir := leanSoureDir
-  libRoots := #[`Ffi, `DataFrame]
+  libRoots := #[`LeanMySQL, `DataFrame]
   moreLibTargets := #[cLibTarget pkgDir]
   moreLinkArgs := #["-L", libsDir, mySQLLinkArg]
 }

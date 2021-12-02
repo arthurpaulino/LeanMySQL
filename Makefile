@@ -8,3 +8,6 @@ build:
 
 run:
 	@./build/bin/LeanMySQL
+
+test:
+	@make build && make run
