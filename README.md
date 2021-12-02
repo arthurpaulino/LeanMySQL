@@ -5,7 +5,7 @@ This Lean 4 package provides an API for the MySQL database.
 Usage example:
 
 ```lean
-import MySQLFfi
+import LeanMySQL
 
 def main : IO Unit := do
   let mysql ← MySQL.mk
