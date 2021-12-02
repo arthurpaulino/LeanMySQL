@@ -58,3 +58,11 @@ It was implemented to serve as a rudimentary return of `getQueryResult`.
 
 A better solution would be more similar to Python's `pandas`, using low level storage and manipulation
 while providing a good higher level interface.
+
+## What's next?
+
+* Provide a better way to create tables and make queries without relying so much on freestyle
+strings, which are prone to error;
+* Plug in a more efficient data structure for query results;
+
+Feel free to contribute! :D
