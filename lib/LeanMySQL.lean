@@ -29,22 +29,22 @@ def toFloat! (s : String) : Float :=
     else
       -1.0 * l.getLast!.toNat!.toFloat
 
-def toDType! (t : String) : DType :=
+def toDataType! (t : String) : DataType :=
   if t = "i" then
-    DType.DInt
+    DataType.DInt
   else
     if t = "f" then
-      DType.DFloat
+      DataType.DFloat
     else
-      DType.DString
+      DataType.DString
 
-def toEntry! (s : String) (dType : DType) : Entry :=
+def toEntry! (s : String) (dataType : DataType) : Entry :=
   if s ≠ "NULL" then
-    match dType with
-    | DType.DInt => s.toInt!
-    | DType.DFloat => s.toFloat!
-    | DType.DString => s
-    | DType.DAny => s
+    match dataType with
+    | DataType.DInt => s.toInt!
+    | DataType.DFloat => s.toFloat!
+    | DataType.DString => s
+    | DataType.DAny => s
   else
     Entry.null
 
@@ -63,15 +63,15 @@ def fromString (s : String) : DataFrame := do
     let mut header : Header := []
     for headerPart in lines.head!.splitOn colSep do
       let split : List String := headerPart.splitOn typeSep
-      header := header.concat (split.head!, split.getLast!.toDType!)
+      header := header.concat (split.head!, split.getLast!.toDataType!)
     let mut rows : List Row := []
     for row in lines.tail! do
       let mut j : Nat := 0
       let mut rowData : List Entry := []
       let rowSplit := row.splitOn colSep
-      for dType in header.map λ h => h.2 do
+      for dataType in header.colTypes do
         let valString : String := rowSplit.get! j
-        rowData := rowData.concat (valString.toEntry! dType)
+        rowData := rowData.concat (valString.toEntry! dataType)
         j := j + 1
       rows := rows.concat rowData
     (DataFrame.empty.setHeader header).addRows rows

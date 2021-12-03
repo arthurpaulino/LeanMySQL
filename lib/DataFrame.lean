@@ -105,24 +105,7 @@ def build (r : Row) : String :=
 
 end Row
 
-open Lean
-
-abbrev ColName := Name
-
-namespace ColName
-
-def toString (c : ColName) : String := Name.toString c
-
-def length (c : ColName) : Nat := c.toString.length
-
-def fromString (s : String) : ColName := Lean.Name.mkSimple s
-
-instance : Coe String ColName where
-  coe := ColName.fromString
-
-end ColName
-
-inductive DType
+inductive DataType
   | DInt
   | DFloat
   | DString
@@ -131,12 +114,12 @@ inductive DType
 
 namespace Entry
 
-def toDType (e : Entry) : DType :=
+def toDataType (e : Entry) : DataType :=
   match e with
-  | Entry.int e => DType.DInt
-  | Entry.float e => DType.DFloat
-  | Entry.str e => DType.DString
-  | Entry.null => DType.DAny
+  | Entry.int e => DataType.DInt
+  | Entry.float e => DataType.DFloat
+  | Entry.str e => DataType.DString
+  | Entry.null => DataType.DAny
 
 def toFloatEntryIfIntEntry (e : Entry) : Entry :=
   match e with
@@ -145,14 +128,14 @@ def toFloatEntryIfIntEntry (e : Entry) : Entry :=
 
 end Entry
 
-abbrev Header := List (ColName × DType)
+abbrev Header := List (String × DataType)
 
 namespace Header
 
-def colNames (header : Header) : List ColName :=
+def colNames (header : Header) : List String :=
   header.map λ h => h.1
 
-def colTypes (header : Header) : List DType :=
+def colTypes (header : Header) : List DataType :=
   header.map λ h => h.2
 
 end Header
@@ -174,9 +157,9 @@ def setHeader (df : DataFrame) (header : Header) : DataFrame := do
   else
     if df.header.length ≠ header.length then
       panic! "inconsistent header length"
-    let mut invalidItems : List (ColName × ColName) := []
-    for ((dfColName, dfDType), (colName, dType)) in df.header.zip header do
-      if dfDType ≠ DType.DAny ∧ dfDType ≠ dType then
+    let mut invalidItems : List (String × String) := []
+    for ((dfColName, dfDataType), (colName, dataType)) in df.header.zip header do
+      if dfDataType ≠ DataType.DAny ∧ dfDataType ≠ dataType then
         invalidItems := invalidItems.concat (dfColName, colName)
     if ¬invalidItems.isEmpty then
       panic! s!"inconsistent types for old columns {invalidItems.map λ i => i.1} " ++
@@ -187,14 +170,14 @@ def setHeader (df : DataFrame) (header : Header) : DataFrame := do
 def addRow (df : DataFrame) (row : Row) : DataFrame := do
   if df.header.length ≠ row.length then
     panic! "inconsistent row size"
-  let mut invalidItems : List (ColName × Entry) := []
+  let mut invalidItems : List (String × Entry) := []
   let mut newRow : Row := []
-  for ((dfColName, dfDType), e) in df.header.zip row do
-    let eDType := e.toDType
-    if dfDType = eDType ∨ [dfDType, eDType].contains DType.DAny then
+  for ((dfColName, dfDataType), e) in df.header.zip row do
+    let eDataType := e.toDataType
+    if dfDataType = eDataType ∨ [dfDataType, eDataType].contains DataType.DAny then
       newRow := newRow.concat e
     else
-      if eDType = DType.DInt ∧ dfDType = DType.DFloat then
+      if eDataType = DataType.DInt ∧ dfDataType = DataType.DFloat then
         newRow := newRow.concat e.toFloatEntryIfIntEntry
       else
         invalidItems := invalidItems.concat (dfColName, e)
@@ -211,7 +194,7 @@ def addRows (df : DataFrame) (rows : List Row) : DataFrame := do
     df := df.addRow row
   df
 
-def new (colNames : List ColName) (colTypes : List DType) (rows : List Row := []) : DataFrame :=
+def new (colNames : List String) (colTypes : List DataType) (rows : List Row := []) : DataFrame :=
   if colNames.length ≠ colTypes.length then
     panic! "columns names and types of different lengths"
   else
@@ -226,10 +209,10 @@ def nCols (df : DataFrame) : Nat :=
 def shape (df : DataFrame) : Nat × Nat :=
   (df.nRows, df.nCols)
 
-def colNames (df : DataFrame) : List ColName :=
+def colNames (df : DataFrame) : List String :=
   df.header.colNames
 
-def colTypes (df : DataFrame) : List DType :=
+def colTypes (df : DataFrame) : List DataType :=
   df.header.colTypes
 
 def row! (df : DataFrame) (i : Nat) : Row :=
@@ -279,11 +262,11 @@ def toString (df : DataFrame) : String := do
   else
     let mut cells : List (List String) := []
     let mut colLengths : List Nat := []
-    let mut header : List ColName := []
+    let mut header : List String := []
     for colName in df.colNames do
       colLengths := colLengths.concat colName.length
       header := header.concat colName
-    cells := cells.concat (header.map ColName.toString)
+    cells := cells.concat header
     for row in df.rows do
       let mut line : List String := []
       let rowStrings : List String := row.toStrings
