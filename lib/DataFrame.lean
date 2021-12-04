@@ -4,14 +4,6 @@
   Authors: Arthur Paulino
 -/
 
-namespace List
-
-def reversed : List α → List α
-  | nil      => nil
-  | cons h t => (reversed t).concat h
-
-end List
-
 namespace Int
 
 def toFloat : Int → Float
@@ -28,7 +20,7 @@ def withoutRightmostZeros (s : String) : String := do
     let mut rangeList : List Nat := []
     for i in [0 : data.length] do
       rangeList := rangeList.concat i
-    for i in rangeList.reversed do
+    for i in rangeList.reverse do
       if i = 0 then
         return ""
       if (data.get! i) ≠ '0' then
