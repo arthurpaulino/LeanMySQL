@@ -52,7 +52,7 @@ end String
 
 namespace DataFrame
 
-def fromString (s : String) : DataFrame := do
+def fromString (s : String) : DataFrame := Id.run do
   if s.isEmpty then
     DataFrame.empty
   else

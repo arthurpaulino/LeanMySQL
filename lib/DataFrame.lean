@@ -14,7 +14,7 @@ end Int
 
 namespace String
 
-def withoutRightmostZeros (s : String) : String := do
+def withoutRightmostZeros (s : String) : String := Id.run do
   if s ≠ "" then
     let data := s.data
     let mut rangeList : List Nat := []
@@ -42,7 +42,7 @@ def optimizeFloatString (s : String) : String :=
     else
       panic! "ill-formed float string"
 
-def leftFillWithUntil (s : String) (f : Char) (n : Nat) : String := do
+def leftFillWithUntil (s : String) (f : Char) (n : Nat) : String := Id.run do
   let mut data : List Char := s.data
   for _ in [0 : n - s.length] do
     data := [f].append data
@@ -143,7 +143,7 @@ namespace DataFrame
 
 constant empty : DataFrame := ⟨[], []⟩
 
-def setHeader (df : DataFrame) (header : Header) : DataFrame := do
+def setHeader (df : DataFrame) (header : Header) : DataFrame := Id.run do
   if df.rows.isEmpty then
     ⟨header, df.rows⟩
   else
@@ -159,7 +159,7 @@ def setHeader (df : DataFrame) (header : Header) : DataFrame := do
     else
       ⟨header, df.rows⟩
 
-def addRow (df : DataFrame) (row : Row) : DataFrame := do
+def addRow (df : DataFrame) (row : Row) : DataFrame := Id.run do
   if df.header.length ≠ row.length then
     panic! "inconsistent row size"
   let mut invalidItems : List (String × Entry) := []
@@ -180,7 +180,7 @@ def addRow (df : DataFrame) (row : Row) : DataFrame := do
     ⟨df.header, df.rows.concat newRow⟩
 
 
-def addRows (df : DataFrame) (rows : List Row) : DataFrame := do
+def addRows (df : DataFrame) (rows : List Row) : DataFrame := Id.run do
   let mut df : DataFrame := df
   for row in rows do
     df := df.addRow row
@@ -213,7 +213,7 @@ def row! (df : DataFrame) (i : Nat) : Row :=
   else
     (df.rows.get! i)
 
-def rows! (df : DataFrame) (li : List Nat) : List Row := do
+def rows! (df : DataFrame) (li : List Nat) : List Row := Id.run do
   let mut invalidIndexes : List Nat := []
   for i in li do
     if i >= df.rows.length then
@@ -229,7 +229,7 @@ def col! (df : DataFrame) (j : Nat) : Col :=
   else
     df.rows.map λ r => r.get! j
 
-def cols! (df : DataFrame) (lj : List Nat) : List Col := do
+def cols! (df : DataFrame) (lj : List Nat) : List Col := Id.run do
   let mut invalidIndexes : List Nat := []
   for j in lj do
     if j >= df.header.length then
@@ -248,7 +248,7 @@ def at! (df : DataFrame) (i j : Nat) : Entry :=
     else
       (df.row! i).get! j
 
-def toString (df : DataFrame) : String := do
+def toString (df : DataFrame) : String := Id.run do
   if df.nCols = 0 then
     ""
   else
