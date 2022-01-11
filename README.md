@@ -50,19 +50,9 @@ The example above prints out:
 |'Craig'| 22|  1.76|                NULL|
 ```
 
-## DataFrame
-
-This package (for now) also comes with a `DataFrame` and some functions for its usage.
-
-It was implemented to serve as a rudimentary return of `getQueryResult`.
-
-A better solution would be more similar to Python's `pandas`, using low level storage and manipulation
-while providing a good higher level interface.
-
 ## What's next?
 
-* Provide a better way to create tables and make queries without relying so much on freestyle
-strings, which are prone to error;
-* Plug in a more efficient data structure for query results;
+* Provide a better way to create tables and make queries without relying so much
+on freestyle strings, which are prone to error
 
 Feel free to contribute! :D

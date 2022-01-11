@@ -11,48 +11,25 @@ constant initMySQL : BaseIO Unit
 
 builtin_initialize initMySQL
 
-namespace String
-
-def toFloat! (s : String) : Float :=
-  let split := s.splitOn "."
-  let l := split.head!.splitOn "-"
-  if split.length = 2 then
-    let r := split.getLast!
-    let rFloat := r.toNat!.toFloat / (10.0 ^ r.length.toFloat)
-    if l.length = 1 then
-      l.head!.toNat!.toFloat + rFloat
-    else
-      -1.0 * (l.getLast!.toNat!.toFloat + rFloat)
-  else
-    if l.length = 1 then
-      l.head!.toNat!.toFloat
-    else
-      -1.0 * l.getLast!.toNat!.toFloat
-
 def toDataType! (t : String) : DataType :=
   if t = "i" then
-    DataType.DInt
+    DataType.TInt
   else
     if t = "f" then
-      DataType.DFloat
+      DataType.TFloat
     else
-      DataType.DString
+      DataType.TString
 
-def toEntry! (s : String) (dataType : DataType) : Entry :=
+def toEntry! (s : String) (dataType : DataType) : DataEntry :=
   if s ≠ "NULL" then
     match dataType with
-    | DataType.DInt => s.toInt!
-    | DataType.DFloat => s.toFloat!
-    | DataType.DString => s
-    | DataType.DAny => s
+    | DataType.TInt    => s.toInt!
+    | DataType.TFloat  => toFloat! s
+    | DataType.TString => s
   else
-    Entry.null
+    DataEntry.NULL
 
-end String
-
-namespace DataFrame
-
-def fromString (s : String) : DataFrame := Id.run do
+def DataFrame.fromString (s : String) : DataFrame := Id.run do
   if s.isEmpty then
     DataFrame.empty
   else
@@ -63,29 +40,26 @@ def fromString (s : String) : DataFrame := Id.run do
     let mut header : Header := []
     for headerPart in lines.head!.splitOn colSep do
       let split : List String := headerPart.splitOn typeSep
-      header := header.concat (split.head!, split.getLast!.toDataType!)
-    let mut rows : List Row := []
+      header := header.concat (toDataType! split.getLast!, split.head!)
+    let mut df : DataFrame := DataFrame.empty header
     for row in lines.tail! do
       let mut j : Nat := 0
-      let mut rowData : List Entry := []
+      let mut rowData : List DataEntry := []
       let rowSplit := row.splitOn colSep
       for dataType in header.colTypes do
         let valString : String := rowSplit.get! j
-        rowData := rowData.concat (valString.toEntry! dataType)
+        rowData := rowData.concat (toEntry! valString dataType)
         j := j + 1
-      rows := rows.concat rowData
-    (DataFrame.empty.setHeader header).addRows rows
-
-end DataFrame
+      df := df.addRow rowData sorry -- no consistency guaranteed
+    df
 
 abbrev MySQLScheme := List (String × String)
 
-namespace MySQLScheme
-
-def build (ts : MySQLScheme) : String :=
+def MySQLScheme.build (ts : MySQLScheme) : String :=
   s!"({",".intercalate (ts.map λ v => " ".intercalate [v.1, v.2])})"
 
-end MySQLScheme
+def Row.build (r : Row) : String :=
+  s!"({",".intercalate (r.toStrings)})"
 
 constant MySQL : Type
 
