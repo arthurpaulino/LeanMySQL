@@ -10,6 +10,7 @@ inductive DataType
   | TInt
   | TFloat
   | TString
+  deriving Inhabited
 
 open DataType
 
@@ -17,9 +18,9 @@ inductive DataEntry
   | EInt (i : Int)
   | EFloat (f : Float)
   | EString (s : String)
-  | NULL
+  | ENull
 
-def NULL := DataEntry.NULL
+def NULL := DataEntry.ENull
 
 instance : Coe Int DataEntry where
   coe := DataEntry.EInt
@@ -33,6 +34,14 @@ instance : OfScientific DataEntry where
 instance : Coe String DataEntry where
   coe := DataEntry.EString
 
+def DataType.entryOfString!
+    (dataType : DataType) (s : String) : DataEntry :=
+  if s = "NULL" then NULL
+  else match dataType with
+  | DataType.TInt    => s.toInt!
+  | DataType.TFloat  => toFloat! s
+  | DataType.TString => s
+
 namespace DataEntry
 
 @[simp] def isOf (e : DataEntry) (t : DataType) : Prop :=
@@ -40,7 +49,7 @@ namespace DataEntry
   | EInt _,    TInt    => True
   | EFloat _,  TFloat  => True
   | EString _, TString => True
-  | NULL,      _       => True
+  | ENull,     _       => True
   | _,         _       => False
 
 protected def toString (e : DataEntry) : String := 
@@ -48,7 +57,7 @@ protected def toString (e : DataEntry) : String :=
   | EInt e    => toString e
   | EFloat e  => optimizeFloatString $ toString e
   | EString e => s!"'{e}'"
-  | NULL      => "NULL"
+  | ENull     => "NULL"
 
 instance : ToString DataEntry where
   toString e := e.toString
@@ -65,17 +74,17 @@ def Header.colNames (h : Header) : List String :=
 
 abbrev Row := List DataEntry
 
-@[simp] def rowOfTypes : Row → List DataType → Prop
+@[simp] def Row.ofTypes : Row → List DataType → Prop
   | [],       []       => True
-  | eh :: et, th :: tt => eh.isOf th ∧ rowOfTypes et tt
+  | eh :: et, th :: tt => eh.isOf th ∧ ofTypes et tt
   | _,        _        => False
+
+@[simp] def rowsOfTypes : List Row → List DataType → Prop
+  | row :: rows, types => row.ofTypes types ∧ rowsOfTypes rows types
+  | [],          _     => True
 
 def Row.toStrings (r : Row) : List String :=
   r.map DataEntry.toString
-
-@[simp] def rowsOfTypes : List Row → List DataType → Prop
-  | row :: rows, types => rowOfTypes row types ∧ rowsOfTypes rows types
-  | [],          _     => True
 
 structure DataFrame where
   header     : Header 
@@ -84,21 +93,27 @@ structure DataFrame where
 
 namespace DataFrame
 
+def colNames (df : DataFrame) : List String :=
+  df.header.colNames
+
+def colTypes (df : DataFrame) : List DataType :=
+  df.header.colTypes
+
 def empty (header : Header := []) : DataFrame :=
   ⟨header, [], by simp⟩
 
 theorem consistentConcatOfConsistentRow
     {df : DataFrame} (row : Row)
-    (hc : rowOfTypes row df.header.colTypes) :
+    (hc : row.ofTypes df.colTypes) :
       rowsOfTypes (df.rows.concat row) (Header.colTypes df.header) :=
   match df with
     | ⟨_, rows, hr⟩ => by
       induction rows with
-        | nil         => simp [hc]
+        | nil         => simp only [colTypes] at hc; simp [hc]
         | cons _ _ hi => exact ⟨hr.1, hi hr.2 hc⟩
 
 def addRow (df : DataFrame) (row : Row)
-    (h : rowOfTypes row df.header.colTypes := by simp) : DataFrame :=
+    (h : row.ofTypes df.colTypes := by simp) : DataFrame :=
   ⟨df.header, df.rows.concat row, consistentConcatOfConsistentRow row h⟩
 
 def nRows (df : DataFrame) : Nat :=
@@ -110,15 +125,8 @@ def nCols (df : DataFrame) : Nat :=
 def shape (df : DataFrame) : Nat × Nat :=
   (df.nRows, df.nCols)
 
-def colNames (df : DataFrame) : List String :=
-  df.header.colNames
-
-def colTypes (df : DataFrame) : List DataType :=
-  df.header.colTypes
-
 def toString (df : DataFrame) : String := Id.run do
-  if df.nCols = 0 then
-    ""
+  if df.nCols = 0 then ""
   else
     let mut cells : List (List String) := []
     let mut colLengths : List Nat := []

@@ -11,27 +11,11 @@ constant initMySQL : BaseIO Unit
 
 builtin_initialize initMySQL
 
-def toDataType! (t : String) : DataType :=
-  if t = "i" then
-    DataType.TInt
-  else
-    if t = "f" then
-      DataType.TFloat
-    else
-      DataType.TString
-
-def toEntry! (s : String) (dataType : DataType) : DataEntry :=
-  if s ≠ "NULL" then
-    match dataType with
-    | DataType.TInt    => s.toInt!
-    | DataType.TFloat  => toFloat! s
-    | DataType.TString => s
-  else
-    DataEntry.NULL
+def dataTypeMap := mapFromList
+  [("i", DataType.TInt), ("f", DataType.TFloat), ("s", DataType.TString)]
 
 def DataFrame.fromString (s : String) : DataFrame := Id.run do
-  if s.isEmpty then
-    DataFrame.empty
+  if s.isEmpty then DataFrame.empty
   else
     let typeSep : String := "^^"
     let colSep : String := "~~"
@@ -40,7 +24,8 @@ def DataFrame.fromString (s : String) : DataFrame := Id.run do
     let mut header : Header := []
     for headerPart in lines.head!.splitOn colSep do
       let split : List String := headerPart.splitOn typeSep
-      header := header.concat (toDataType! split.getLast!, split.head!)
+      header := header.concat
+        (dataTypeMap.find! split.getLast!, split.head!)
     let mut df : DataFrame := DataFrame.empty header
     for row in lines.tail! do
       let mut j : Nat := 0
@@ -48,7 +33,7 @@ def DataFrame.fromString (s : String) : DataFrame := Id.run do
       let rowSplit := row.splitOn colSep
       for dataType in header.colTypes do
         let valString : String := rowSplit.get! j
-        rowData := rowData.concat (toEntry! valString dataType)
+        rowData := rowData.concat $ dataType.entryOfString! valString
         j := j + 1
       df := df.addRow rowData sorry -- no consistency guaranteed
     df

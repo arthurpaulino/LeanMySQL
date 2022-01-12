@@ -4,6 +4,14 @@
   Authors: Arthur Paulino
 -/
 
+/- Auxiliary functions to represent a `DataFrame` as a `String` -/
+
+import Std
+
+def mapFromList {α β : Type} [BEq α] [Hashable α]
+    (l : List (α × β)) : Std.HashMap α β :=
+  l.foldl (fun m t => m.insert t.fst t.snd) Std.HashMap.empty
+
 def withoutRightmostZeros (s : String) : String := Id.run do
   if s ≠ "" then
     let data := s.data
