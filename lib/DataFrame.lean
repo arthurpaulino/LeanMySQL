@@ -21,19 +21,17 @@ inductive DataEntry
 
 def NULL := DataEntry.NULL
 
-open DataEntry
-
 instance : Coe Int DataEntry where
-  coe := EInt
+  coe := DataEntry.EInt
 
 instance : Coe Float DataEntry where
-  coe := EFloat
+  coe := DataEntry.EFloat
 
 instance : OfScientific DataEntry where
-  ofScientific m s e := EFloat (OfScientific.ofScientific m s e)
+  ofScientific m s e := DataEntry.EFloat (OfScientific.ofScientific m s e)
 
 instance : Coe String DataEntry where
-  coe := EString
+  coe := DataEntry.EString
 
 namespace DataEntry
 
