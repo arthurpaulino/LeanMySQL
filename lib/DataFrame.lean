@@ -80,7 +80,7 @@ def Row.toStrings (r : Row) : List String :=
 structure DataFrame where
   header     : Header 
   rows       : List Row
-  consistent : rowsOfTypes rows header.colTypes := by simp
+  consistent : rowsOfTypes rows header.colTypes
 
 namespace DataFrame
 
@@ -90,9 +90,12 @@ def empty (header : Header := []) : DataFrame :=
 theorem consistentDFofConsistentRow
     {df : DataFrame} (row : List DataEntry)
     (hc : rowOfTypes row df.header.colTypes) :
-      rowsOfTypes (df.rows.concat row) (Header.colTypes df.header) := by
-  have hc := df.consistent
-  sorry -- todo
+      rowsOfTypes (df.rows.concat row) (Header.colTypes df.header) :=
+  match df with
+    | ⟨_, rows, hr⟩ => by
+      induction rows with
+        | nil => simp [hc]
+        | cons h t hi => exact ⟨hr.1, hi hr.2 hc⟩
 
 def addRow (df : DataFrame) (row : List DataEntry)
     (h : rowOfTypes row df.header.colTypes := by simp) : DataFrame :=
@@ -155,3 +158,23 @@ instance : ToString DataFrame where
   toString df := df.toString
 
 end DataFrame
+
+def allPos : List Nat → Prop
+  | [] => True
+  | h :: t => 0 < h ∧ allPos t
+
+structure Foo where
+  data  : List Nat
+  allPos : allPos data
+
+theorem Bar {f : Foo} (n : Nat) (hl : 0 < n) :
+    allPos (f.data.concat n) :=
+  match f with
+    | ⟨data, hh⟩ => by
+      induction data with
+        | nil =>
+          simp [allPos]
+          exact hl
+        | cons h t hi =>
+          simp [allPos]
+          exact ⟨hh.1, hi hh.2⟩
