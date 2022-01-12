@@ -55,11 +55,6 @@ instance : ToString DataEntry where
 
 end DataEntry
 
-@[simp] def rowOfTypes : List DataEntry → List DataType → Prop
-  | [],       []       => True
-  | eh :: et, th :: tt => eh.isOf th ∧ rowOfTypes et tt
-  | _,        _        => False
-
 abbrev Header := List (DataType × String)
 
 def Header.colTypes (h : Header) : List DataType :=
@@ -69,6 +64,11 @@ def Header.colNames (h : Header) : List String :=
   h.map fun x => x.2
 
 abbrev Row := List DataEntry
+
+@[simp] def rowOfTypes : Row → List DataType → Prop
+  | [],       []       => True
+  | eh :: et, th :: tt => eh.isOf th ∧ rowOfTypes et tt
+  | _,        _        => False
 
 def Row.toStrings (r : Row) : List String :=
   r.map DataEntry.toString
@@ -84,12 +84,14 @@ structure DataFrame where
 
 namespace DataFrame
 
-def empty (header : Header := []) : DataFrame := ⟨header, [], by simp⟩
+def empty (header : Header := []) : DataFrame :=
+  ⟨header, [], by simp⟩
 
 theorem consistentDFofConsistentRow
     {df : DataFrame} (row : List DataEntry)
-    (h : rowOfTypes row df.header.colTypes) :
-      rowsOfTypes (df.rows.concat row) (Header.colTypes df.header) :=
+    (hc : rowOfTypes row df.header.colTypes) :
+      rowsOfTypes (df.rows.concat row) (Header.colTypes df.header) := by
+  have hc := df.consistent
   sorry -- todo
 
 def addRow (df : DataFrame) (row : List DataEntry)
