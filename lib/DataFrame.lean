@@ -80,26 +80,26 @@ def Row.toStrings (r : Row) : List String :=
 structure DataFrame where
   header     : Header 
   rows       : List Row
-  consistent : rowsOfTypes rows header.colTypes
+  consistent : rowsOfTypes rows header.colTypes := by simp
 
 namespace DataFrame
 
 def empty (header : Header := []) : DataFrame :=
   ⟨header, [], by simp⟩
 
-theorem consistentDFofConsistentRow
+theorem consistentConcatOfConsistentRow
     {df : DataFrame} (row : List DataEntry)
     (hc : rowOfTypes row df.header.colTypes) :
       rowsOfTypes (df.rows.concat row) (Header.colTypes df.header) :=
   match df with
     | ⟨_, rows, hr⟩ => by
       induction rows with
-        | nil => simp [hc]
-        | cons h t hi => exact ⟨hr.1, hi hr.2 hc⟩
+        | nil         => simp [hc]
+        | cons _ _ hi => exact ⟨hr.1, hi hr.2 hc⟩
 
 def addRow (df : DataFrame) (row : List DataEntry)
     (h : rowOfTypes row df.header.colTypes := by simp) : DataFrame :=
-  ⟨df.header, df.rows.concat row, consistentDFofConsistentRow row h⟩
+  ⟨df.header, df.rows.concat row, consistentConcatOfConsistentRow row h⟩
 
 def nRows (df : DataFrame) : Nat :=
   df.rows.length
