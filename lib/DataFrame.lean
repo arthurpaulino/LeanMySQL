@@ -88,7 +88,7 @@ def empty (header : Header := []) : DataFrame :=
   ⟨header, [], by simp⟩
 
 theorem consistentConcatOfConsistentRow
-    {df : DataFrame} (row : List DataEntry)
+    {df : DataFrame} (row : Row)
     (hc : rowOfTypes row df.header.colTypes) :
       rowsOfTypes (df.rows.concat row) (Header.colTypes df.header) :=
   match df with
@@ -97,7 +97,7 @@ theorem consistentConcatOfConsistentRow
         | nil         => simp [hc]
         | cons _ _ hi => exact ⟨hr.1, hi hr.2 hc⟩
 
-def addRow (df : DataFrame) (row : List DataEntry)
+def addRow (df : DataFrame) (row : Row)
     (h : rowOfTypes row df.header.colTypes := by simp) : DataFrame :=
   ⟨df.header, df.rows.concat row, consistentConcatOfConsistentRow row h⟩
 
@@ -158,23 +158,3 @@ instance : ToString DataFrame where
   toString df := df.toString
 
 end DataFrame
-
-def allPos : List Nat → Prop
-  | [] => True
-  | h :: t => 0 < h ∧ allPos t
-
-structure Foo where
-  data  : List Nat
-  allPos : allPos data
-
-theorem Bar {f : Foo} (n : Nat) (hl : 0 < n) :
-    allPos (f.data.concat n) :=
-  match f with
-    | ⟨data, hh⟩ => by
-      induction data with
-        | nil =>
-          simp [allPos]
-          exact hl
-        | cons h t hi =>
-          simp [allPos]
-          exact ⟨hh.1, hi hh.2⟩
