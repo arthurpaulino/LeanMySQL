@@ -73,24 +73,23 @@ def Header.colTypes (h : Header) : List DataType :=
 def Header.colNames (h : Header) : List String :=
   h.map fun x => x.2
 
-abbrev Col := List DataEntry
-abbrev Row := List DataEntry
+abbrev DataEntries := List DataEntry
 
-@[simp] def Row.ofTypes : Row → List DataType → Prop
+@[simp] def DataEntries.ofTypes : DataEntries → List DataType → Prop
   | [],       []       => True
   | eh :: et, th :: tt => eh.isOf th ∧ ofTypes et tt
   | _,        _        => False
 
-@[simp] def rowsOfTypes : List Row → List DataType → Prop
+@[simp] def rowsOfTypes : List DataEntries → List DataType → Prop
   | row :: rows, types => row.ofTypes types ∧ rowsOfTypes rows types
   | [],          _     => True
 
-def Row.toStrings (r : Row) : List String :=
+def DataEntries.toStrings (r : DataEntries) : List String :=
   r.map DataEntry.toString
 
 structure DataFrame where
   header     : Header 
-  rows       : List Row
+  rows       : List DataEntries
   consistent : rowsOfTypes rows header.colTypes := by simp
 
 namespace DataFrame
@@ -105,7 +104,7 @@ def empty (header : Header := []) : DataFrame :=
   ⟨header, [], by simp⟩
 
 theorem consistentConcatOfConsistentRow
-    {df : DataFrame} (row : Row)
+    {df : DataFrame} (row : DataEntries)
     (hc : row.ofTypes df.colTypes) :
       rowsOfTypes (df.rows.concat row) (Header.colTypes df.header) :=
   match df with
@@ -114,7 +113,7 @@ theorem consistentConcatOfConsistentRow
         | nil         => simp only [colTypes] at hc; simp [hc]
         | cons _ _ hi => exact ⟨hr.1, hi hr.2 hc⟩
 
-def addRow (df : DataFrame) (row : Row)
+def addRow (df : DataFrame) (row : DataEntries)
     (h : row.ofTypes df.colTypes := by simp) : DataFrame :=
   ⟨df.header, df.rows.concat row, consistentConcatOfConsistentRow row h⟩
 
@@ -127,13 +126,13 @@ def nCols (df : DataFrame) : Nat :=
 def shape (df : DataFrame) : Nat × Nat :=
   (df.nRows, df.nCols)
 
-def row! (df : DataFrame) (i : Nat) : Row :=
+def row! (df : DataFrame) (i : Nat) : DataEntries :=
   if i >= df.rows.length then
     panic! s!"invalid index {i}"
   else
     (df.rows.get! i)
 
-def rows! (df : DataFrame) (li : List Nat) : List Row := Id.run do
+def rows! (df : DataFrame) (li : List Nat) : List DataEntries := Id.run do
   let mut invalidIndexes : List Nat := []
   for i in li do
     if i >= df.rows.length then
@@ -143,13 +142,13 @@ def rows! (df : DataFrame) (li : List Nat) : List Row := Id.run do
   else
     li.map fun i => df.row! i
 
-def col! (df : DataFrame) (j : Nat) : Col :=
+def col! (df : DataFrame) (j : Nat) : DataEntries :=
   if j >= df.header.length then
     panic! s!"invalid index {j}"
   else
     df.rows.map fun r => r.get! j
 
-def cols! (df : DataFrame) (lj : List Nat) : List Col := Id.run do
+def cols! (df : DataFrame) (lj : List Nat) : List DataEntries := Id.run do
   let mut invalidIndexes : List Nat := []
   for j in lj do
     if j >= df.header.length then
