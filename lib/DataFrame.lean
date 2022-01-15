@@ -19,6 +19,7 @@ inductive DataEntry
   | EFloat (f : Float)
   | EString (s : String)
   | ENull
+  deriving Inhabited
 
 def NULL := DataEntry.ENull
 
@@ -72,6 +73,7 @@ def Header.colTypes (h : Header) : List DataType :=
 def Header.colNames (h : Header) : List String :=
   h.map fun x => x.2
 
+abbrev Col := List DataEntry
 abbrev Row := List DataEntry
 
 @[simp] def Row.ofTypes : Row → List DataType → Prop
@@ -124,6 +126,47 @@ def nCols (df : DataFrame) : Nat :=
 
 def shape (df : DataFrame) : Nat × Nat :=
   (df.nRows, df.nCols)
+
+def row! (df : DataFrame) (i : Nat) : Row :=
+  if i >= df.rows.length then
+    panic! s!"invalid index {i}"
+  else
+    (df.rows.get! i)
+
+def rows! (df : DataFrame) (li : List Nat) : List Row := Id.run do
+  let mut invalidIndexes : List Nat := []
+  for i in li do
+    if i >= df.rows.length then
+      invalidIndexes := invalidIndexes.concat i
+  if ¬invalidIndexes.isEmpty then
+    panic! s!"invalid indexes {invalidIndexes}"
+  else
+    li.map fun i => df.row! i
+
+def col! (df : DataFrame) (j : Nat) : Col :=
+  if j >= df.header.length then
+    panic! s!"invalid index {j}"
+  else
+    df.rows.map fun r => r.get! j
+
+def cols! (df : DataFrame) (lj : List Nat) : List Col := Id.run do
+  let mut invalidIndexes : List Nat := []
+  for j in lj do
+    if j >= df.header.length then
+      invalidIndexes := invalidIndexes.concat j
+  if ¬invalidIndexes.isEmpty then
+    panic! s!"invalid indexes {invalidIndexes}"
+  else
+    lj.map fun j => df.col! j
+
+def at! (df : DataFrame) (i j : Nat) : DataEntry :=
+  if i >= df.rows.length then
+    panic! s!"invalid row index {i}"
+  else
+    if j >= df.header.length then
+      panic! s!"invalid column index {j}"
+    else
+      (df.row! i).get! j
 
 def toString (df : DataFrame) : String := Id.run do
   if df.nCols = 0 then ""
