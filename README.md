@@ -33,10 +33,12 @@ def main : IO Unit := do
   mysql.insertIntoTable "person" [2, "Bob", 21, 1.64, 2, 3]
   mysql.insertIntoTable "person" [3, "Craig", 22, 1.76, NULL, 2]
 
-  mysql.query ("select name, age, height, job_name " ++
+  let df ← mysql.query ("select name, age, height, job_name " ++
     "from person left join job on person.job_id = job.id")
+
+  IO.println $ df
+
   mysql.close
-  IO.println $ mysql.getQueryResult
 ```
 
 The example above prints out:
@@ -52,7 +54,6 @@ The example above prints out:
 
 ## What's next?
 
-* Provide a better way to create tables and make queries without relying so much
-on freestyle strings, which are prone to error
+* Provide a proper SQL DSL instead of relying on unsafe strings
 
 Feel free to contribute! :D

@@ -4,14 +4,16 @@
   Authors: Arthur Paulino
 -/
 
-/- Auxiliary functions to represent a `DataFrame` as a `String` -/
-
 import Std
 
+/- Auxiliary functions to represent a `DataFrame` as a `String` -/
+
+/- Creates a `HashMap` from a list of key-value pairs -/
 def mapFromList {α β : Type} [BEq α] [Hashable α]
     (l : List (α × β)) : Std.HashMap α β :=
   l.foldl (fun m t => m.insert t.fst t.snd) Std.HashMap.empty
 
+/- Removes trailing zeros form the right side of a string -/
 def withoutRightmostZeros (s : String) : String := Id.run do
   if s ≠ "" then
     let data := s.data
@@ -28,6 +30,7 @@ def withoutRightmostZeros (s : String) : String := Id.run do
   else
     s
 
+/- Makes a string representation of a `Float` more compact -/
 def optimizeFloatString (s : String) : String :=
   let split := s.splitOn "."
   let length := split.length
@@ -40,12 +43,14 @@ def optimizeFloatString (s : String) : String :=
     else
       panic! "ill-formed float string"
 
-def leftFillWithUntil (s : String) (f : Char) (n : Nat) : String := Id.run do
+/- Fills the left side of a `String` with a character `c`, `n` times -/
+def leftFillWithUntil (s : String) (c : Char) (n : Nat) : String := Id.run do
   let mut data : List Char := s.data
   for _ in [0 : n - s.length] do
-    data := [f].append data
+    data := [c].append data
   ⟨data⟩
 
+/- Parses a `Float` from a `String` -/
 def toFloat! (s : String) : Float :=
   let split := s.splitOn "."
   let l := split.head!.splitOn "-"

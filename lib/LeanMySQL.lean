@@ -11,9 +11,11 @@ constant initMySQL : BaseIO Unit
 
 builtin_initialize initMySQL
 
+/- Conventioned `DataType` of certain strings -/
 def dataTypeMap := mapFromList
   [("i", DataType.TInt), ("f", DataType.TFloat), ("s", DataType.TString)]
 
+/- Builds a `DataFrame` from a properly formated `String` -/
 def DataFrame.fromString (s : String) : DataFrame := Id.run do
   if s.isEmpty then DataFrame.empty
   else
@@ -41,9 +43,9 @@ def DataFrame.fromString (s : String) : DataFrame := Id.run do
 abbrev MySQLScheme := List (String × String)
 
 def MySQLScheme.build (ts : MySQLScheme) : String :=
-  s!"({",".intercalate (ts.map λ v => " ".intercalate [v.1, v.2])})"
+  s!"({",".intercalate (ts.map fun v => " ".intercalate [v.1, v.2])})"
 
-def Row.build (r : Row) : String :=
+def DataEntries.build (r : DataEntries) : String :=
   s!"({",".intercalate (r.toStrings)})"
 
 constant MySQL : Type
@@ -56,46 +58,58 @@ def gb (b : UInt64) : UInt64 := 1073741824 * b
 
 namespace MySQL
 
+/- Instantiates the object that provides access to MySQL API -/
 @[extern "lean_mysql_mk"]
 constant mk (bufferSize : UInt64 := kb 8) : IO MySQL
 
+/- Sets the buffer size for queries -/
 @[extern "lean_mysql_set_buffer_size"]
 constant setBufferSizeMB (bufferSize : UInt64) : IO Unit
 
+/- MySQL server version -/
 @[extern "lean_mysql_version"]
 constant version (m : MySQL) : String
 
+/- Makes the login in the MySQL server -/
 @[extern "lean_mysql_login"]
 constant login (m : MySQL) (h u p : String) : IO Unit
 
 @[extern "lean_mysql_run"]
 private constant run (m : MySQL) (q : String) : IO Unit
 
+/- Creates a new database -/
 def createDB (m : MySQL) (d : String) : IO Unit :=
   m.run ("create database " ++ d)
 
+/- Drops a database -/
 def dropDB (m : MySQL) (d : String) : IO Unit :=
   m.run ("drop database " ++ d)
 
+/- Sets a database to be used -/
 def useDB (m : MySQL) (d : String) : IO Unit :=
   m.run ("use " ++ d)
 
+/- Creates a table in the currently used database -/
 def createTable (m : MySQL) (n : String) (ts : MySQLScheme) : IO Unit :=
   m.run ("create table " ++ (n ++ ts.build))
 
+/- Drops a table in the currently used database -/
 def dropTable (m : MySQL) (n : String) : IO Unit :=
   m.run ("drop table " ++ n)
 
-def insertIntoTable (m : MySQL) (n : String) (r : Row) : IO Unit :=
+/- Inserts a row into a table -/
+def insertIntoTable (m : MySQL) (n : String) (r : DataEntries) : IO Unit :=
   m.run s!"insert into {n} values{r.build}"
 
 @[extern "lean_mysql_process_query_result"]
 private constant processQueryResult (m : MySQL) : String
 
+/- Runs an SQL query and returns a `DataFrame` with the results -/
 def query (m : MySQL) (q : String) : IO DataFrame := do
   m.run q
   DataFrame.fromString (processQueryResult m)
 
+/- Closes the connection with the MySQL server -/
 @[extern "lean_mysql_close"]
 constant close (m : MySQL) : BaseIO Unit
 
