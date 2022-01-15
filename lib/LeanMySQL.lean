@@ -69,7 +69,7 @@ constant version (m : MySQL) : String
 constant login (m : MySQL) (h u p : String) : IO Unit
 
 @[extern "lean_mysql_run"]
-constant run (m : MySQL) (q : String) : IO Unit
+private constant run (m : MySQL) (q : String) : IO Unit
 
 def createDB (m : MySQL) (d : String) : IO Unit :=
   m.run ("create database " ++ d)
@@ -89,14 +89,12 @@ def dropTable (m : MySQL) (n : String) : IO Unit :=
 def insertIntoTable (m : MySQL) (n : String) (r : Row) : IO Unit :=
   m.run s!"insert into {n} values{r.build}"
 
-@[extern "lean_mysql_query"]
-constant query (m : MySQL) (q : String) : IO Unit
+@[extern "lean_mysql_process_query_result"]
+private constant processQueryResult (m : MySQL) : String
 
-@[extern "lean_mysql_get_query_result"]
-constant getQueryResultBuffer (m : MySQL) : String
-
-def getQueryResult (m : MySQL) : DataFrame :=
-  DataFrame.fromString (getQueryResultBuffer m)
+def query (m : MySQL) (q : String) : IO DataFrame := do
+  m.run q
+  DataFrame.fromString (processQueryResult m)
 
 @[extern "lean_mysql_close"]
 constant close (m : MySQL) : BaseIO Unit

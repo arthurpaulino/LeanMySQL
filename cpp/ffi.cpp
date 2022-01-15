@@ -36,6 +36,7 @@ static const char* ERR_INCR_BFFR = "Not enough memory. Try increasing the buffer
 static const char* INT = "i";
 static const char* FLOAT = "f";
 static const char* STRING = "s";
+
 static const char* NULL_ = "NULL";
 
 static const char* TYPE_SEP = "^^";
@@ -186,19 +187,10 @@ external l_res lean_mysql_run(l_arg m_, l_arg q_) {
     return lean_io_result_mk_ok(lean_box(0));
 }
 
-external l_res lean_mysql_query(l_arg m_, l_arg q_) {
+external l_res lean_mysql_process_query_result(l_arg m_) {
     mysql* m = mysql_unbox(m_);
-    if (!m->logged) {
-        return make_error(ERR_NOT_LOGGED);
-    }
-
-    query(m, lean_string_cstr(q_));
-    if (m->status) {
-        return make_error(mysql_error(m->connection));
-    }
 
     m->buffer_pos = 0;
-    m->has_result = 0;
 
     // encoding header
     int num_fields = mysql_num_fields(m->result);
@@ -252,16 +244,6 @@ external l_res lean_mysql_query(l_arg m_, l_arg q_) {
         return make_error(ERR_INCR_BFFR);
     }
 
-    m->has_result = 1;
-
-    return lean_io_result_mk_ok(lean_box(0));
-}
-
-external l_res lean_mysql_get_query_result(l_arg m_) {
-    mysql* m = mysql_unbox(m_);
-    if (!m->has_result) {
-        return lean_io_result_mk_ok(lean_mk_string(""));
-    }
     return lean_mk_string(m->buffer);
 }
 
