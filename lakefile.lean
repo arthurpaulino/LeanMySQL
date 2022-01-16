@@ -3,9 +3,9 @@ import Lake
 open System Lake DSL
 
 def leanSoureDir := "lib"
-def cppCompiler := "g++"
-def cppDir : FilePath := "cpp"
-def ffiSrc := cppDir / "ffi.cpp"
+def cppCompiler := "c++"
+def cppDir : FilePath := "c"
+def ffiSrc := cppDir / "ffi.c"
 def ffiO := "ffi.o"
 def ffiLib := "libffi.a"
 def includesDir := "/usr/include/"
