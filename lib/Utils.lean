@@ -8,11 +8,6 @@ import Std
 
 /- Auxiliary functions to represent a `DataFrame` as a `String` -/
 
-/- Creates a `HashMap` from a list of key-value pairs -/
-def mapFromList {α β : Type} [BEq α] [Hashable α]
-    (l : List (α × β)) : Std.HashMap α β :=
-  l.foldl (fun m t => m.insert t.fst t.snd) Std.HashMap.empty
-
 /- Removes trailing zeros form the right side of a string -/
 def withoutRightmostZeros (s : String) : String := Id.run do
   if s ≠ "" then

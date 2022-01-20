@@ -5,6 +5,7 @@
 -/
 
 import DataFrame
+import Std
 
 @[extern "lean_mysql_initialize"]
 constant initMySQL : BaseIO Unit
@@ -12,8 +13,10 @@ constant initMySQL : BaseIO Unit
 builtin_initialize initMySQL
 
 /- Conventioned `DataType` of certain strings -/
-def dataTypeMap := mapFromList
-  [("i", DataType.TInt), ("f", DataType.TFloat), ("s", DataType.TString)]
+open Std (HashMap) in
+def dataTypeMap : HashMap String DataType :=
+  HashMap.ofList
+    [("i", DataType.TInt), ("f", DataType.TFloat), ("s", DataType.TString)]
 
 /- Builds a `DataFrame` from a properly formated `String` -/
 def DataFrame.fromString (s : String) : DataFrame := Id.run do
