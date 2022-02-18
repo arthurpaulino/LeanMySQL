@@ -23,11 +23,20 @@ inductive DataEntry
 
 def NULL := DataEntry.ENull
 
+instance : OfNat DataEntry n where
+  ofNat := DataEntry.EInt (Int.ofNat n)
+
 instance : Coe Int DataEntry where
   coe := DataEntry.EInt
 
 instance : Coe Float DataEntry where
   coe := DataEntry.EFloat
+
+instance : Neg DataEntry where
+  neg n := match n with
+  | DataEntry.EInt i   => ((-1 : Int) * i : Int)
+  | DataEntry.EFloat f => ((-1.0 : Float) * f : Float)
+  | _                  => panic! "invalid DataEntry"
 
 instance : OfScientific DataEntry where
   ofScientific m s e := DataEntry.EFloat (OfScientific.ofScientific m s e)
@@ -67,6 +76,7 @@ instance : ToString DataEntry where
   toString e := e.toString
 
 end DataEntry
+
 
 abbrev Header := List (DataType × String)
 

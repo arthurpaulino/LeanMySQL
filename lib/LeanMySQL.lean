@@ -110,7 +110,7 @@ private constant processQueryResult (m : MySQL) : String
 /- Runs an SQL query and returns a `DataFrame` with the results -/
 def query (m : MySQL) (q : String) : IO DataFrame := do
   m.run q
-  DataFrame.fromString (processQueryResult m)
+  pure $ DataFrame.fromString (processQueryResult m)
 
 /- Closes the connection with the MySQL server -/
 @[extern "lean_mysql_close"]
