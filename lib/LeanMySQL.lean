@@ -26,22 +26,18 @@ def DataFrame.fromString (s : String) : DataFrame := Id.run do
     let colSep : String := "~~"
     let lineSep : String := "¨¨"
     let lines : List String := s.splitOn lineSep
-    let mut header : Header := []
-    for headerPart in lines.head!.splitOn colSep do
-      let split : List String := headerPart.splitOn typeSep
-      header := header.concat
-        (dataTypeMap.find! split.getLast!, split.head!)
-    let mut df : DataFrame := DataFrame.empty header
-    for row in lines.tail! do
-      let mut j : Nat := 0
-      let mut rowData : List DataEntry := []
-      let rowSplit := row.splitOn colSep
-      for dataType in header.colTypes do
-        let valString : String := rowSplit.get! j
-        rowData := rowData.concat $ dataType.entryOfString! valString
-        j := j + 1
-      df := df.addRow rowData sorry -- no consistency guaranteed
-    df
+    if h : lines = [] then DataFrame.empty
+    else
+      let mut header : Header := []
+      for headerPart in (lines.head h).splitOn colSep do
+        let split : List String := headerPart.splitOn typeSep
+        header := header.concat (dataTypeMap.find! split.getLast!, split.head!)
+      let mut df : DataFrame := DataFrame.empty header
+      for row in lines.tailD [] do
+        df := df.addRow
+          (DataType.entriesOfStrings! df.colTypes $ row.splitOn colSep)
+          DataType.entriesOfStringsOfTypes
+      df
 
 abbrev MySQLScheme := List (String × String)
 

@@ -33,9 +33,9 @@ instance : Coe Float DataEntry where
   coe := DataEntry.EFloat
 
 instance : Neg DataEntry where
-  neg n := match n with
-  | DataEntry.EInt i   => ((-1 : Int) * i : Int)
-  | DataEntry.EFloat f => ((-1.0 : Float) * f : Float)
+  neg e := match e with
+  | DataEntry.EInt   i => ((-1 : Int) * i : Int)
+  | DataEntry.EFloat f => ((-1 : Float) * f : Float)
   | _                  => panic! "invalid DataEntry"
 
 instance : OfScientific DataEntry where
@@ -45,27 +45,29 @@ instance : Coe String DataEntry where
   coe := DataEntry.EString
 
 /- Prouces a `DataEntry` given its `DataType` and a `String` -/
-def DataType.entryOfString!
-    (dataType : DataType) (s : String) : DataEntry :=
+def DataType.entryOfString! (dataType : DataType) (s : String) : DataEntry :=
   if s = "NULL" then NULL
   else match dataType with
   | DataType.TInt    => s.toInt!
   | DataType.TFloat  => toFloat! s
   | DataType.TString => s
 
-namespace DataEntry
-
 /- Whether a `DataEntry` is of a `DataType` or not -/
-@[simp] def isOf (e : DataEntry) (t : DataType) : Prop :=
-  match e, t with
+@[simp] def DataEntry.ofType : DataEntry → DataType → Prop
   | EInt _,    TInt    => True
   | EFloat _,  TFloat  => True
   | EString _, TString => True
   | ENull,     _       => True
   | _,         _       => False
 
+theorem DataEntry.entryOfStringOfType {t : DataType} {s : String} :
+    (entryOfString! t s).ofType t := by
+  by_cases h : s = "NULL"
+  case inl => simp only [h, entryOfString!, ofType, NULL]
+  case inr => cases t with | _ => simp only [h, entryOfString!, ofType]
+
 /- The `String` representation of a `DataEntry` -/
-protected def toString (e : DataEntry) : String := 
+protected def DataEntry.toString (e : DataEntry) : String := 
   match e with
   | EInt e    => toString e
   | EFloat e  => optimizeFloatString $ toString e
@@ -74,9 +76,6 @@ protected def toString (e : DataEntry) : String :=
 
 instance : ToString DataEntry where
   toString e := e.toString
-
-end DataEntry
-
 
 abbrev Header := List (DataType × String)
 
@@ -93,9 +92,18 @@ abbrev DataEntries := List DataEntry
 /- Given a list of `DataEntry` and a list of `DataType`, tells whether
   every `DataEntry` is of `DataType` in a "zip" logic -/
 @[simp] def DataEntries.ofTypes : DataEntries → List DataType → Prop
+  | eh :: et, th :: tt => eh.ofType th ∧ ofTypes et tt
   | [],       []       => True
-  | eh :: et, th :: tt => eh.isOf th ∧ ofTypes et tt
   | _,        _        => False
+
+/-- Given a list of `DataType`, turns a list of `String` into a list of
+  `DataEntry` according to the respective type from the list -/
+def DataType.entriesOfStrings! : List DataType → List String → DataEntries
+  | t :: ts, s :: ss => t.entryOfString! s :: (entriesOfStrings! ts ss)
+  | _,       _       => []
+
+theorem DataType.entriesOfStringsOfTypes {ts : List DataType} {ss : List String} :
+    (entriesOfStrings! ts ss).ofTypes ts := sorry
 
 /- Whether every list of `DataEntry` obeys to `DataEntries.ofTypes` -/
 @[simp] def rowsOfTypes : List DataEntries → List DataType → Prop
