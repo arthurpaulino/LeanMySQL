@@ -53,18 +53,12 @@ def DataType.entryOfString! (dataType : DataType) (s : String) : DataEntry :=
   | DataType.TString => s
 
 /- Whether a `DataEntry` is of a `DataType` or not -/
-@[simp] def DataEntry.ofType : DataEntry → DataType → Prop
-  | EInt _,    TInt    => True
-  | EFloat _,  TFloat  => True
-  | EString _, TString => True
-  | ENull,     _       => True
-  | _,         _       => False
-
-theorem DataEntry.entryOfStringOfType {t : DataType} {s : String} :
-    (entryOfString! t s).ofType t := by
-  by_cases h : s = "NULL"
-  case inl => simp only [h, entryOfString!, ofType, NULL]
-  case inr => cases t with | _ => simp only [h, entryOfString!, ofType]
+@[simp] def DataEntry.ofType : DataEntry → DataType → Bool
+  | EInt _,    TInt    => true
+  | EFloat _,  TFloat  => true
+  | EString _, TString => true
+  | ENull,     _       => true
+  | _,         _       => false
 
 /- The `String` representation of a `DataEntry` -/
 protected def DataEntry.toString (e : DataEntry) : String := 
@@ -91,19 +85,16 @@ abbrev DataEntries := List DataEntry
 
 /- Given a list of `DataEntry` and a list of `DataType`, tells whether
   every `DataEntry` is of `DataType` in a "zip" logic -/
-@[simp] def DataEntries.ofTypes : DataEntries → List DataType → Prop
-  | eh :: et, th :: tt => eh.ofType th ∧ ofTypes et tt
-  | [],       []       => True
-  | _,        _        => False
+@[simp] def DataEntries.ofTypes : DataEntries → List DataType → Bool
+  | e :: es, t :: ts => e.ofType t && ofTypes es ts
+  | [],      []      => true
+  | _,       _       => false
 
 /-- Given a list of `DataType`, turns a list of `String` into a list of
   `DataEntry` according to the respective type from the list -/
 def DataType.entriesOfStrings! : List DataType → List String → DataEntries
   | t :: ts, s :: ss => t.entryOfString! s :: (entriesOfStrings! ts ss)
   | _,       _       => []
-
-theorem DataType.entriesOfStringsOfTypes {ts : List DataType} {ss : List String} :
-    (entriesOfStrings! ts ss).ofTypes ts := sorry
 
 /- Whether every list of `DataEntry` obeys to `DataEntries.ofTypes` -/
 @[simp] def rowsOfTypes : List DataEntries → List DataType → Prop

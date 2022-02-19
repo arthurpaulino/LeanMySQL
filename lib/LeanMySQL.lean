@@ -23,7 +23,7 @@ def DataFrame.fromString (s : String) : DataFrame := Id.run do
   if s.isEmpty then DataFrame.empty
   else
     let typeSep : String := "^^"
-    let colSep : String := "~~"
+    let colSep  : String := "~~"
     let lineSep : String := "¨¨"
     let lines : List String := s.splitOn lineSep
     if h : lines = [] then DataFrame.empty
@@ -34,9 +34,14 @@ def DataFrame.fromString (s : String) : DataFrame := Id.run do
         header := header.concat (dataTypeMap.find! split.getLast!, split.head!)
       let mut df : DataFrame := DataFrame.empty header
       for row in lines.tailD [] do
-        df := df.addRow
-          (DataType.entriesOfStrings! df.colTypes $ row.splitOn colSep)
-          DataType.entriesOfStringsOfTypes
+        let entries := DataType.entriesOfStrings! df.colTypes $
+          row.splitOn colSep
+        if ht : entries.ofTypes df.colTypes then
+          df := df.addRow
+            (DataType.entriesOfStrings! df.colTypes (row.splitOn colSep))
+            ht
+        else
+          panic! s!"inconsistent entries: {entries}"
       df
 
 abbrev MySQLScheme := List (String × String)
