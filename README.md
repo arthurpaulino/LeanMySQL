@@ -54,6 +54,7 @@ The example above prints out:
 
 ## What's next?
 
+* Replace lists by arrays in the implementation of dataframes
 * Provide a proper SQL DSL instead of relying on unsafe strings
 
 Feel free to contribute! :D
