@@ -34,12 +34,9 @@ def DataFrame.fromString (s : String) : DataFrame := Id.run do
         header := header.concat (dataTypeMap.find! split.getLast!, split.head!)
       let mut df : DataFrame := DataFrame.empty header
       for row in lines.tailD [] do
-        let entries := DataType.entriesOfStrings! df.colTypes $
-          row.splitOn colSep
+        let entries := entriesOfStrings! df.colTypes $ row.splitOn colSep
         if ht : entries.ofTypes df.colTypes then
-          df := df.addRow
-            (DataType.entriesOfStrings! df.colTypes (row.splitOn colSep))
-            ht
+          df := df.addRow entries ht
         else
           panic! s!"inconsistent entries: {entries}"
       df

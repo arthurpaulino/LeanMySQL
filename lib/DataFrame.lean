@@ -92,7 +92,7 @@ abbrev DataEntries := List DataEntry
 
 /-- Given a list of `DataType`, turns a list of `String` into a list of
   `DataEntry` according to the respective type from the list -/
-def DataType.entriesOfStrings! : List DataType → List String → DataEntries
+def entriesOfStrings! : List DataType → List String → DataEntries
   | t :: ts, s :: ss => t.entryOfString! s :: (entriesOfStrings! ts ss)
   | _,       _       => []
 
