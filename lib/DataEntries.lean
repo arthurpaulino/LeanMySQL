@@ -4,6 +4,8 @@
   Authors: Arthur Paulino
 -/
 
+import Utils
+
 inductive DataEntry
   | EInt (i : Int)
   | EFloat (f : Float)
@@ -33,3 +35,11 @@ instance : OfScientific DataEntry where
 
 instance : Coe String DataEntry where
   coe := DataEntry.EString
+
+/- The `String` representation of a `DataEntry` -/
+protected def DataEntry.toString (e : DataEntry) : String := 
+  match e with
+  | EInt e    => toString e
+  | EFloat e  => optimizeFloatString $ toString e
+  | EString e => s!"'{e}'"
+  | ENull     => "NULL"

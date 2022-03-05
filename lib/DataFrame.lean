@@ -30,14 +30,6 @@ open DataType in
   | ENull,     _       => true
   | _,         _       => false
 
-/- The `String` representation of a `DataEntry` -/
-protected def DataEntry.toString (e : DataEntry) : String := 
-  match e with
-  | EInt e    => toString e
-  | EFloat e  => optimizeFloatString $ toString e
-  | EString e => s!"'{e}'"
-  | ENull     => "NULL"
-
 instance : ToString DataEntry where
   toString e := e.toString
 
