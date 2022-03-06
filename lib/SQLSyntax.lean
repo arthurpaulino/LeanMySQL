@@ -15,7 +15,7 @@ syntax ident "AS" ident : colStx
 
 declare_syntax_cat selectStx
 syntax "*"       : selectStx
-syntax colStx,*  : selectStx
+syntax colStx,+  : selectStx
 
 def mkStrOfIdent (id : Syntax) : Expr :=
   mkStrLit id.getId.toString
@@ -37,7 +37,6 @@ def mkSelect (distinctStx selectStx : Syntax) : MetaM Expr :=
   match selectStx with
   | `(selectStx|*)            =>
     pure $ mkApp (mkConst `SQLSelect.all) (mkBoolLit !distinctStx.isNone)
-  | `(selectStx|)             => throwUnsupportedSyntax
   | `(selectStx|$cs:colStx,*) => do
     let cols ← mkListLit (mkConst `SQLColumn) (← cs.getElems.toList.mapM mkCol)
     pure $ mkApp2 (mkConst `SQLSelect.list) (mkBoolLit !distinctStx.isNone) cols
