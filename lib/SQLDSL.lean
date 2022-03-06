@@ -5,7 +5,6 @@
 -/
 
 import DataEntries
-import Lean
 
 inductive SQLColumn
   | col : String    → SQLColumn
