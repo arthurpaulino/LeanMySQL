@@ -12,8 +12,8 @@ inductive SQLColumn
   | as  : SQLColumn → String → SQLColumn
 
 inductive SQLSelect
-  | list : List SQLColumn → SQLSelect
-  | all  : SQLSelect
+  | list : Bool → List SQLColumn → SQLSelect
+  | all  : Bool → SQLSelect
 
 inductive SQLWhere
   | all : SQLWhere
@@ -46,15 +46,16 @@ structure SQLQuery where
   FROM   : SQLFrom
   WHERE  : SQLWhere
 
-open SQLSelect SQLColumn SQLTableJoin SQLFrom SQLWhere
-
 def SQLColumn.toString : SQLColumn → String
   | col s   => s
   | as  c s => s!"{c.toString} AS {s}"
 
+def SQLSelect.distinct? (d : Bool) : String :=
+  if d then "DISTINCT " else default
+
 def SQLSelect.toString : SQLSelect → String
-  | list l => ", ".intercalate $ l.map (SQLColumn.toString)
-  | all    => "*"
+  | list d l => (distinct? d).append $ ", ".intercalate $ l.map (SQLColumn.toString)
+  | all  d   => (distinct? d).append $ "*"
 
 def SQLWhere.toString : SQLWhere → String
   | all     => "TRUE"
@@ -88,11 +89,15 @@ def SQLFrom.toString : SQLFrom → String
 def SQLQuery.toString (q : SQLQuery) : String :=
   s!"SELECT {q.SELECT.toString} FROM {q.FROM.toString} WHERE {q.WHERE.toString}"
 
+open SQLSelect SQLColumn SQLTableJoin SQLFrom SQLWhere
+
 def q : SQLQuery := ⟨
-  list [col "name", as (col "age") "age_years"],
+  list true [col "name", as (col "age") "age_years"],
   join left (eqC (col "person.id") (col "job.person_id")) (table "person") (table "job"),
   and (eqE (col "name") "Arthur") (ltE (col "age_years") 50)
 ⟩
 
 #eval q.toString
--- "SELECT name, age AS age_years FROM person LEFT JOIN job ON person.id = job.person_id WHERE (name = 'Arthur') AND (age_years < 50)"
+-- SELECT DISTINCT name, age AS age_years
+-- FROM person LEFT JOIN job ON person.id = job.person_id
+-- WHERE (name = 'Arthur') AND (age_years < 50)"
