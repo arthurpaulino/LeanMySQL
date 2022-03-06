@@ -6,70 +6,70 @@
 
 import DataEntries
 
-inductive SQLColumn
-  | col : String    → SQLColumn
-  | as  : SQLColumn → String → SQLColumn
+inductive SQLSelectField
+  | col   : String → SQLSelectField
+  | alias : String → String         → SQLSelectField
 
 inductive SQLSelect
-  | list : Bool → List SQLColumn → SQLSelect
+  | list : Bool → List SQLSelectField → SQLSelect
   | all  : Bool → SQLSelect
 
-inductive SQLWhere
-  | all : SQLWhere
-  | eqC : SQLColumn → SQLColumn → SQLWhere
-  | neC : SQLColumn → SQLColumn → SQLWhere
-  | ltC : SQLColumn → SQLColumn → SQLWhere
-  | leC : SQLColumn → SQLColumn → SQLWhere
-  | gtC : SQLColumn → SQLColumn → SQLWhere
-  | geC : SQLColumn → SQLColumn → SQLWhere
-  | eqE : SQLColumn → DataEntry → SQLWhere
-  | neE : SQLColumn → DataEntry → SQLWhere
-  | ltE : SQLColumn → DataEntry → SQLWhere
-  | leE : SQLColumn → DataEntry → SQLWhere
-  | gtE : SQLColumn → DataEntry → SQLWhere
-  | geE : SQLColumn → DataEntry → SQLWhere
-  | and : SQLWhere  → SQLWhere  → SQLWhere
-  | or  : SQLWhere  → SQLWhere  → SQLWhere
-  | not : SQLWhere  → SQLWhere
+inductive SQLProp
+  | all : SQLProp
+  | eqC : String  → String    → SQLProp
+  | neC : String  → String    → SQLProp
+  | ltC : String  → String    → SQLProp
+  | leC : String  → String    → SQLProp
+  | gtC : String  → String    → SQLProp
+  | geC : String  → String    → SQLProp
+  | eqE : String  → DataEntry → SQLProp
+  | neE : String  → DataEntry → SQLProp
+  | ltE : String  → DataEntry → SQLProp
+  | leE : String  → DataEntry → SQLProp
+  | gtE : String  → DataEntry → SQLProp
+  | geE : String  → DataEntry → SQLProp
+  | and : SQLProp → SQLProp   → SQLProp
+  | or  : SQLProp → SQLProp   → SQLProp
+  | not : SQLProp → SQLProp
 
 inductive SQLTableJoin
   | inner | left | right | outer
 
 inductive SQLFrom
   | table : String       → SQLFrom
-  | as    : SQLFrom      → String   → SQLFrom
-  | join  : SQLTableJoin → SQLWhere → SQLFrom → SQLFrom → SQLFrom
+  | alias : SQLFrom      → String  → SQLFrom
+  | join  : SQLTableJoin → SQLFrom → SQLFrom → SQLProp → SQLFrom
 
 structure SQLQuery where
   SELECT : SQLSelect
   FROM   : SQLFrom
-  WHERE  : SQLWhere
+  WHERE  : SQLProp
 
-def SQLColumn.toString : SQLColumn → String
-  | col s   => s
-  | as  c s => s!"{c.toString} AS {s}"
+def SQLSelectField.toString : SQLSelectField → String
+  | col   c   => c
+  | alias c a => s!"{c} AS {a}"
 
 def SQLSelect.distinct? (d : Bool) : String :=
   if d then "DISTINCT " else default
 
 def SQLSelect.toString : SQLSelect → String
-  | list d l => (distinct? d).append $ ", ".intercalate $ l.map (SQLColumn.toString)
+  | list d l => (distinct? d).append $ ", ".intercalate $ l.map (SQLSelectField.toString)
   | all  d   => (distinct? d).append $ "*"
 
-def SQLWhere.toString : SQLWhere → String
+def SQLProp.toString : SQLProp → String
   | all     => "TRUE"
-  | eqC l r => s!"{l.toString} = {r.toString}"
-  | neC l r => s!"{l.toString} <> {r.toString}"
-  | ltC l r => s!"{l.toString} < {r.toString}"
-  | leC l r => s!"{l.toString} <= {r.toString}"
-  | gtC l r => s!"{l.toString} > {r.toString}"
-  | geC l r => s!"{l.toString} >= {r.toString}"
-  | eqE l r => s!"{l.toString} = {r.toString}"
-  | neE l r => s!"{l.toString} <> {r.toString}"
-  | ltE l r => s!"{l.toString} < {r.toString}"
-  | leE l r => s!"{l.toString} <= {r.toString}"
-  | gtE l r => s!"{l.toString} > {r.toString}"
-  | geE l r => s!"{l.toString} >= {r.toString}"
+  | eqC l r => s!"{l} = {r}"
+  | neC l r => s!"{l} <> {r}"
+  | ltC l r => s!"{l} < {r}"
+  | leC l r => s!"{l} <= {r}"
+  | gtC l r => s!"{l} > {r}"
+  | geC l r => s!"{l} >= {r}"
+  | eqE l r => s!"{l} = {r.toString}"
+  | neE l r => s!"{l} <> {r.toString}"
+  | ltE l r => s!"{l} < {r.toString}"
+  | leE l r => s!"{l} <= {r.toString}"
+  | gtE l r => s!"{l} > {r.toString}"
+  | geE l r => s!"{l} >= {r.toString}"
   | and l r => s!"({l.toString}) AND ({r.toString})"
   | or  l r => s!"({l.toString}) OR ({r.toString})"
   | not w   => s!"NOT ({w.toString})"
@@ -82,21 +82,21 @@ def SQLTableJoin.toString : SQLTableJoin → String
 
 def SQLFrom.toString : SQLFrom → String
   | table s       => s
-  | as    f s     => s!"({f.toString}) AS {s}"
-  | join  j w l r => s!"{l.toString} {j.toString} JOIN {r.toString} ON {w.toString}"
+  | alias f s     => s!"({f.toString}) AS {s}"
+  | join  j l r p => s!"{l.toString} {j.toString} JOIN {r.toString} ON {p.toString}"
 
 def SQLQuery.toString (q : SQLQuery) : String :=
   s!"SELECT {q.SELECT.toString} FROM {q.FROM.toString} WHERE {q.WHERE.toString}"
 
-open SQLSelect SQLColumn SQLTableJoin SQLFrom SQLWhere
+open SQLSelectField SQLSelect SQLTableJoin SQLFrom SQLProp
 
 def q : SQLQuery := ⟨
-  list true [col "name", as (col "age") "age_years"],
-  join left (eqC (col "person.id") (col "job.person_id")) (table "person") (table "job"),
-  and (eqE (col "name") "Arthur") (ltE (col "age_years") 50)
+  list true [col "name", alias "age" "age_years"],
+  join left (table "person") (table "job") (eqC "person.job_id" "job.id"),
+  and (eqE "name" "Arthur") (ltE "age" 50)
 ⟩
 
 #eval q.toString
 -- SELECT DISTINCT name, age AS age_years
--- FROM person LEFT JOIN job ON person.id = job.person_id
--- WHERE (name = 'Arthur') AND (age_years < 50)"
+-- FROM person LEFT JOIN job ON person.job_id = job.id
+-- WHERE (name = 'Arthur') AND (age < 50)"

@@ -4,30 +4,37 @@
   Authors: Arthur Paulino
 -/
 
-import SQLDSL
 import Lean
+import SQLDSL
 
 open Lean Elab Meta
 
-declare_syntax_cat        colStx
-syntax ident            : colStx
-syntax ident "AS" ident : colStx
+declare_syntax_cat        selectField
+syntax ident            : selectField
+syntax ident "AS" ident : selectField
 
-declare_syntax_cat selectStx
-syntax "*"       : selectStx
-syntax colStx,+  : selectStx
+declare_syntax_cat     sqlSelect
+syntax "*"           : sqlSelect
+syntax selectField,+ : sqlSelect
+
+declare_syntax_cat        sqlProp
+syntax ident "="  ident : sqlProp
+syntax ident "<>" ident : sqlProp
+syntax ident "<"  ident : sqlProp
+syntax ident "<=" ident : sqlProp
+syntax ident ">"  ident : sqlProp
+syntax ident ">=" ident : sqlProp
 
 def mkStrOfIdent (id : Syntax) : Expr :=
   mkStrLit id.getId.toString
 
 def mkCol (colStx : Syntax) : MetaM Expr :=
   match colStx with
-  | `(colStx|$c:ident)             =>
-    pure $ mkApp (mkConst `SQLColumn.col) (mkStrOfIdent c)
-  | `(colStx|$c:ident AS $a:ident) => do
-    let col := mkApp (mkConst `SQLColumn.col) (mkStrOfIdent c)
-    pure $ mkApp2 (mkConst `SQLColumn.as) col (mkStrOfIdent a)
-  | _                              => throwUnsupportedSyntax
+  | `(selectField|$c:ident)             =>
+    pure $ mkApp (mkConst `SQLSelectField.col) (mkStrOfIdent c)
+  | `(selectField|$c:ident AS $a:ident) =>
+    pure $ mkApp2 (mkConst `SQLSelectField.alias) (mkStrOfIdent c) (mkStrOfIdent a)
+  | _                                   => throwUnsupportedSyntax
 
 def mkBoolLit : Bool → Expr
   | true  => mkConst `Bool.true
@@ -35,14 +42,14 @@ def mkBoolLit : Bool → Expr
 
 def mkSelect (distinctStx selectStx : Syntax) : MetaM Expr :=
   match selectStx with
-  | `(selectStx|*)            =>
+  | `(sqlSelect|*)                 =>
     pure $ mkApp (mkConst `SQLSelect.all) (mkBoolLit !distinctStx.isNone)
-  | `(selectStx|$cs:colStx,*) => do
-    let cols ← mkListLit (mkConst `SQLColumn) (← cs.getElems.toList.mapM mkCol)
+  | `(sqlSelect|$cs:selectField,*) => do
+    let cols ← mkListLit (mkConst `SQLSelectField) (← cs.getElems.toList.mapM mkCol)
     pure $ mkApp2 (mkConst `SQLSelect.list) (mkBoolLit !distinctStx.isNone) cols
-  | _                         => throwUnsupportedSyntax
+  | _                              => throwUnsupportedSyntax
 
-elab "SELECT" distinctStx:"DISTINCT"? selectStx:selectStx : term => do
+elab "SELECT" distinctStx:"DISTINCT"? selectStx:sqlSelect : term => do
   let select ← mkSelect distinctStx selectStx
   pure select
 
