@@ -9,43 +9,44 @@ import Lean
 
 open Lean Elab Meta
 
-declare_syntax_cat col
-syntax ident : col
-syntax ident " AS " ident : col
+declare_syntax_cat        colStx
+syntax ident            : colStx
+syntax ident "AS" ident : colStx
 
-declare_syntax_cat select
-syntax "*" : select
-syntax col,* : select
+declare_syntax_cat selectStx
+syntax "*"       : selectStx
+syntax colStx,*  : selectStx
 
-def mkCol (stx : Syntax) : Expr :=
-  mkApp (mkConst `SQLColumn.col) (mkStrLit stx.getId.toString) 
+def mkStrOfIdent (id : Syntax) : Expr :=
+  mkStrLit id.getId.toString
+
+def mkCol (colStx : Syntax) : MetaM Expr :=
+  match colStx with
+  | `(colStx|$c:ident)             =>
+    pure $ mkApp (mkConst `SQLColumn.col) (mkStrOfIdent c)
+  | `(colStx|$c:ident AS $a:ident) => do
+    let col := mkApp (mkConst `SQLColumn.col) (mkStrOfIdent c)
+    pure $ mkApp2 (mkConst `SQLColumn.as) col (mkStrOfIdent a)
+  | _                              => throwUnsupportedSyntax
 
 def mkBoolLit : Bool → Expr
   | true  => mkConst `Bool.true
   | false => mkConst `Bool.false
 
-def mkSelect (distinct select : Syntax) : MetaM Expr :=
-  match select with
-  | `(select| *)         => pure $ mkApp (mkConst `SQLSelect.all) (mkBoolLit !distinct.isNone)
-  | `(select|)           => throwUnsupportedSyntax
-  | `(select| $cs:col,*) => do
-    let cols ← mkListLit (mkConst `SQLColumn) (cs.getElems.toList.map mkCol)
-    pure $ mkApp2 (mkConst `SQLSelect.list) (mkBoolLit !distinct.isNone) cols
-  | _                    => throwUnsupportedSyntax
+def mkSelect (distinctStx selectStx : Syntax) : MetaM Expr :=
+  match selectStx with
+  | `(selectStx|*)            =>
+    pure $ mkApp (mkConst `SQLSelect.all) (mkBoolLit !distinctStx.isNone)
+  | `(selectStx|)             => throwUnsupportedSyntax
+  | `(selectStx|$cs:colStx,*) => do
+    let cols ← mkListLit (mkConst `SQLColumn) (← cs.getElems.toList.mapM mkCol)
+    pure $ mkApp2 (mkConst `SQLSelect.list) (mkBoolLit !distinctStx.isNone) cols
+  | _                         => throwUnsupportedSyntax
 
-elab "SELECT " distinct:"DISTINCT "? select:select : term => do
-  let s ← mkSelect distinct select
-  pure s
+elab "SELECT" distinctStx:"DISTINCT"? selectStx:selectStx : term => do
+  let select ← mkSelect distinctStx selectStx
+  pure select
 
-#check SELECT a, b
-
-def s : SQLSelect := SELECT DISTINCT a, b
-
--- def mkCol (stx : Syntax) : Expr :=
---   mkApp (mkConst `SQLColumn.col) (mkStrLit stx.getId.toString)
-
--- elab "SELECT " cs:ident,+ : term => do
---   let cols ← mkListLit (mkConst `SQLColumn) (cs.getElems.toList.map mkCol)
---   pure $ mkApp2 (mkConst `SQLSelect.list) (mkConst `Bool.true) cols
-
--- def s : SQLSelect := SELECT a, b
+#check SELECT a, b AS c
+def s : SQLSelect := SELECT DISTINCT a, b AS c
+#eval s.toString
