@@ -21,21 +21,32 @@ syntax "DISTINCT " "*"           : sqlSelect
 syntax selectField,+             : sqlSelect
 syntax "DISTINCT " selectField,+ : sqlSelect
 
-declare_syntax_cat        sqlProp
-syntax "TRUE"           : sqlProp
-syntax "FALSE"          : sqlProp
-syntax ident "="  ident : sqlProp
-syntax ident "<>" ident : sqlProp
-syntax ident "<"  ident : sqlProp
-syntax ident "<=" ident : sqlProp
-syntax ident ">"  ident : sqlProp
-syntax ident ">=" ident : sqlProp
+declare_syntax_cat               sqlProp
+syntax "TRUE"                  : sqlProp
+syntax "FALSE"                 : sqlProp
+syntax ident "="  ident        : sqlProp
+syntax ident "<>" ident        : sqlProp
+syntax ident "<"  ident        : sqlProp
+syntax ident "<=" ident        : sqlProp
+syntax ident ">"  ident        : sqlProp
+syntax ident ">=" ident        : sqlProp
+syntax sqlProp " AND " sqlProp : sqlProp
+syntax sqlProp " OR "  sqlProp : sqlProp
+syntax " NOT " sqlProp         : sqlProp
 
-declare_syntax_cat            sqlFrom
-syntax ident                : sqlFrom
-syntax sqlFrom " AS " ident : sqlFrom
+declare_syntax_cat join
+syntax "INNER "  : join
+syntax "LEFT "   : join
+syntax "RIGHT "  : join
+syntax "OUTER "  : join
 
-syntax (name := query) "SELECT" sqlSelect "FROM" sqlFrom ("WHERE" sqlProp)? : term
+declare_syntax_cat                                  sqlFrom
+syntax ident                                      : sqlFrom
+syntax "(" ident ")"                              : sqlFrom
+syntax sqlFrom " AS " ident                       : sqlFrom
+syntax sqlFrom join "JOIN " sqlFrom "ON " sqlProp : sqlFrom
+
+syntax (name := query) "SELECT " sqlSelect "FROM" sqlFrom ("WHERE" sqlProp)? : term
 
 def mkStrOfIdent (id : Syntax) : Expr :=
   mkStrLit id.getId.toString
@@ -60,22 +71,37 @@ def mkSelect : Syntax → TermElabM Expr
     mkAppM `SQLSelect.list #[mkConst ``true, cols]
   | _                                       => throwUnsupportedSyntax
 
-partial def mkFrom : Syntax → TermElabM Expr
-  | `(sqlFrom|$id:ident) => mkAppM `SQLFrom.table #[mkStrOfIdent id]
-  | _                    => throwUnsupportedSyntax
+def mkConstM (name : Name) : MetaM Expr :=
+  pure $ mkConst name
 
-def mkWhere (whr : Syntax) : TermElabM Expr :=
-  pure $ mkConst `SQLProp.all
+def mkProp : Syntax → TermElabM Expr
+  | stx => mkConstM `SQLProp.tt
+
+def mkJoin : Syntax → TermElabM Expr
+  | `(join|INNER) => mkConstM `SQLJoin.inner
+  | `(join|LEFT)  => mkConstM `SQLJoin.left
+  | `(join|RIGHT) => mkConstM `SQLJoin.right
+  | `(join|OUTER) => mkConstM `SQLJoin.outer
+  | _ => throwUnsupportedSyntax
+
+partial def mkFrom : Syntax → TermElabM Expr
+  | `(sqlFrom|$t:ident)               => mkAppM `SQLFrom.table #[mkStrOfIdent t]
+  | `(sqlFrom|($t:ident))             => mkAppM `SQLFrom.table #[mkStrOfIdent t]
+  | `(sqlFrom|$f:sqlFrom AS $t:ident) => do
+    mkAppM `SQLFrom.alias #[← mkFrom f, mkStrOfIdent t]
+  | `(sqlFrom|$l:sqlFrom $j:join JOIN $r:sqlFrom ON $p:sqlProp) => do
+    mkAppM `SQLFrom.join #[← mkJoin j, ← mkFrom l, ← mkFrom r, ← mkProp p]
+  | _                                 => throwUnsupportedSyntax
 
 @[termElab query] def elabQuery : Term.TermElab := fun stx _ =>
   match stx with
-  | `(query| SELECT $sel FROM $frm $[WHERE $whr]?) => do
-    let whrExp ← match whr with
-      | none     => pure $ mkConst `SQLProp.all
-      | some whr => mkWhere whr
-    mkAppM `SQLQuery.mk #[← mkSelect sel, ← mkFrom frm, whrExp]
+  | `(query| SELECT $sel FROM $frm $[WHERE $prp]?) => do
+    let whr ← match prp with
+    | none     => mkConstM `SQLProp.tt
+    | some prp => mkProp prp
+    mkAppM `SQLQuery.mk #[← mkSelect sel, ← mkFrom frm, whr]
   | _ => throwUnsupportedSyntax
 
-#check SELECT a, b AS c FROM f
-def s : SQLQuery := SELECT DISTINCT a, b AS c FROM f WHERE w = t
+#check SELECT (a), b AS c FROM f
+def s : SQLQuery := SELECT DISTINCT a, b AS c FROM l LEFT JOIN r ON z = x WHERE w = t
 #eval s.toString

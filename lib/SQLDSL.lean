@@ -33,13 +33,13 @@ inductive SQLProp
   | or  : SQLProp → SQLProp   → SQLProp
   | not : SQLProp → SQLProp
 
-inductive SQLTableJoin
+inductive SQLJoin
   | inner | left | right | outer
 
 inductive SQLFrom
-  | table : String       → SQLFrom
-  | alias : SQLFrom      → String  → SQLFrom
-  | join  : SQLTableJoin → SQLFrom → SQLFrom → SQLProp → SQLFrom
+  | table : String  → SQLFrom
+  | alias : SQLFrom → String  → SQLFrom
+  | join  : SQLJoin → SQLFrom → SQLFrom → SQLProp → SQLFrom
 
 structure SQLQuery where
   SELECT : SQLSelect
@@ -76,7 +76,7 @@ def SQLProp.toString : SQLProp → String
   | or  l r => s!"({l.toString}) OR ({r.toString})"
   | not w   => s!"NOT ({w.toString})"
 
-def SQLTableJoin.toString : SQLTableJoin → String
+def SQLJoin.toString : SQLJoin → String
   | inner => "INNER"
   | left  => "LEFT"
   | right => "RIGHT"
@@ -90,7 +90,7 @@ def SQLFrom.toString : SQLFrom → String
 def SQLQuery.toString (q : SQLQuery) : String :=
   s!"SELECT {q.SELECT.toString} FROM {q.FROM.toString} WHERE {q.WHERE.toString}"
 
-open SQLSelectField SQLSelect SQLTableJoin SQLFrom SQLProp
+open SQLSelectField SQLSelect SQLJoin SQLFrom SQLProp
 
 def q : SQLQuery := ⟨
   list true [col "name", alias "age" "age_years"],
