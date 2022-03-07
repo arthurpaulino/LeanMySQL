@@ -38,15 +38,16 @@ syntax " NOT " sqlProp         : sqlProp
 syntax "(" sqlProp ")"         : sqlProp
 
 declare_syntax_cat join
-syntax " INNER "  : join
-syntax " LEFT "   : join
-syntax " RIGHT "  : join
-syntax " OUTER "  : join
+syntax " INNER " : join
+syntax " LEFT "  : join
+syntax " RIGHT " : join
+syntax " OUTER " : join
 
-declare_syntax_cat                                  sqlFrom
-syntax parsId                                     : sqlFrom
-syntax sqlFrom " AS " ident                       : sqlFrom
-syntax sqlFrom join "JOIN " sqlFrom "ON " sqlProp : sqlFrom
+declare_syntax_cat                                    sqlFrom
+syntax ident                                       : sqlFrom
+syntax sqlFrom " AS " ident                         : sqlFrom
+syntax sqlFrom join " JOIN " sqlFrom " ON " sqlProp : sqlFrom
+syntax "(" sqlFrom ")"                              : sqlFrom
 
 syntax (name := query) "SELECT " sqlSelect " FROM " sqlFrom (" WHERE " sqlProp)? : term
 
@@ -90,11 +91,12 @@ def mkJoin : Syntax → TermElabM Expr
   | _             => throwUnsupportedSyntax
 
 partial def mkFrom : Syntax → TermElabM Expr
-  | `(sqlFrom|$t:parsId)              => do mkAppM `SQLFrom.table #[← mkStrOfParsId t]
+  | `(sqlFrom|$t:ident)               => do mkAppM `SQLFrom.table #[mkStrOfIdent t]
   | `(sqlFrom|$f:sqlFrom AS $t:ident) => do
     mkAppM `SQLFrom.alias #[← mkFrom f, mkStrOfIdent t]
   | `(sqlFrom|$l:sqlFrom $j:join JOIN $r:sqlFrom ON $p:sqlProp) => do
     mkAppM `SQLFrom.join #[← mkJoin j, ← mkFrom l, ← mkFrom r, ← mkProp p]
+  | `(sqlFrom|($f:sqlFrom))           => mkFrom f
   | _                                 => throwUnsupportedSyntax
 
 @[termElab query] def elabQuery : Term.TermElab := fun stx _ =>
