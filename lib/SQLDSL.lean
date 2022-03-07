@@ -15,7 +15,8 @@ inductive SQLSelect
   | all  : Bool → SQLSelect
 
 inductive SQLProp
-  | all : SQLProp
+  | tt : SQLProp
+  | ff : SQLProp
   | eqC : String  → String    → SQLProp
   | neC : String  → String    → SQLProp
   | ltC : String  → String    → SQLProp
@@ -57,7 +58,8 @@ def SQLSelect.toString : SQLSelect → String
   | all  d   => (distinct? d).append $ "*"
 
 def SQLProp.toString : SQLProp → String
-  | all     => "TRUE"
+  | tt     => "TRUE"
+  | ff     => "FALSE"
   | eqC l r => s!"{l} = {r}"
   | neC l r => s!"{l} <> {r}"
   | ltC l r => s!"{l} < {r}"
