@@ -9,11 +9,13 @@ import SQLDSL
 
 open Lean Elab Meta
 
-declare_syntax_cat                  selectField
-syntax ident                      : selectField
-syntax ident " AS " ident         : selectField
-syntax "(" ident ")"              : selectField
-syntax "(" ident ")" " AS " ident : selectField
+declare_syntax_cat      parsId
+syntax ident          : parsId
+syntax "(" parsId ")" : parsId
+
+declare_syntax_cat           selectField
+syntax parsId              : selectField
+syntax parsId " AS " ident : selectField
 
 declare_syntax_cat                 sqlSelect
 syntax "*"                       : sqlSelect
@@ -24,41 +26,44 @@ syntax "DISTINCT " selectField,+ : sqlSelect
 declare_syntax_cat               sqlProp
 syntax "TRUE"                  : sqlProp
 syntax "FALSE"                 : sqlProp
-syntax ident "="  ident        : sqlProp
-syntax ident "<>" ident        : sqlProp
-syntax ident "<"  ident        : sqlProp
-syntax ident "<=" ident        : sqlProp
-syntax ident ">"  ident        : sqlProp
-syntax ident ">=" ident        : sqlProp
+syntax parsId "="  parsId      : sqlProp
+syntax parsId "<>" parsId      : sqlProp
+syntax parsId "<"  parsId      : sqlProp
+syntax parsId "<=" parsId      : sqlProp
+syntax parsId ">"  parsId      : sqlProp
+syntax parsId ">=" parsId      : sqlProp
 syntax sqlProp " AND " sqlProp : sqlProp
 syntax sqlProp " OR "  sqlProp : sqlProp
 syntax " NOT " sqlProp         : sqlProp
+syntax "(" sqlProp ")"         : sqlProp
 
 declare_syntax_cat join
-syntax "INNER "  : join
-syntax "LEFT "   : join
-syntax "RIGHT "  : join
-syntax "OUTER "  : join
+syntax " INNER "  : join
+syntax " LEFT "   : join
+syntax " RIGHT "  : join
+syntax " OUTER "  : join
 
 declare_syntax_cat                                  sqlFrom
-syntax ident                                      : sqlFrom
-syntax "(" ident ")"                              : sqlFrom
+syntax parsId                                     : sqlFrom
 syntax sqlFrom " AS " ident                       : sqlFrom
 syntax sqlFrom join "JOIN " sqlFrom "ON " sqlProp : sqlFrom
 
-syntax (name := query) "SELECT " sqlSelect "FROM" sqlFrom ("WHERE" sqlProp)? : term
+syntax (name := query) "SELECT " sqlSelect " FROM " sqlFrom (" WHERE " sqlProp)? : term
 
 def mkStrOfIdent (id : Syntax) : Expr :=
   mkStrLit id.getId.toString
 
+partial def mkStrOfParsId : Syntax → TermElabM Expr
+  | `(parsId|$id:ident)      => pure $ mkStrLit id.getId.toString
+  | `(parsId|($pars:parsId)) => mkStrOfParsId pars
+  | _                        => throwUnsupportedSyntax
+
 def mkCol : Syntax → TermElabM Expr
-  | `(selectField|$c:ident)               => mkAppM `SQLSelectField.col #[mkStrOfIdent c]
-  | `(selectField|($c:ident))             => mkAppM `SQLSelectField.col #[mkStrOfIdent c]
-  | `(selectField|$c:ident AS $a:ident)   =>
-    mkAppM `SQLSelectField.alias #[mkStrOfIdent c, mkStrOfIdent a]
-  | `(selectField|($c:ident) AS $a:ident) =>
-    mkAppM `SQLSelectField.alias #[mkStrOfIdent c, mkStrOfIdent a]
-  | _                                     => throwUnsupportedSyntax
+  | `(selectField|$c:parsId)             => do
+    mkAppM `SQLSelectField.col #[← mkStrOfParsId c]
+  | `(selectField|$c:parsId AS $a:ident) => do
+    mkAppM `SQLSelectField.alias #[← mkStrOfParsId c, mkStrOfIdent a]
+  | _                                    => throwUnsupportedSyntax
 
 def mkSelect : Syntax → TermElabM Expr
   | `(sqlSelect|*)                          => mkAppM `SQLSelect.all #[mkConst ``false]
@@ -82,11 +87,10 @@ def mkJoin : Syntax → TermElabM Expr
   | `(join|LEFT)  => mkConstM `SQLJoin.left
   | `(join|RIGHT) => mkConstM `SQLJoin.right
   | `(join|OUTER) => mkConstM `SQLJoin.outer
-  | _ => throwUnsupportedSyntax
+  | _             => throwUnsupportedSyntax
 
 partial def mkFrom : Syntax → TermElabM Expr
-  | `(sqlFrom|$t:ident)               => mkAppM `SQLFrom.table #[mkStrOfIdent t]
-  | `(sqlFrom|($t:ident))             => mkAppM `SQLFrom.table #[mkStrOfIdent t]
+  | `(sqlFrom|$t:parsId)              => do mkAppM `SQLFrom.table #[← mkStrOfParsId t]
   | `(sqlFrom|$f:sqlFrom AS $t:ident) => do
     mkAppM `SQLFrom.alias #[← mkFrom f, mkStrOfIdent t]
   | `(sqlFrom|$l:sqlFrom $j:join JOIN $r:sqlFrom ON $p:sqlProp) => do
@@ -103,5 +107,7 @@ partial def mkFrom : Syntax → TermElabM Expr
   | _ => throwUnsupportedSyntax
 
 #check SELECT (a), b AS c FROM f
-def s : SQLQuery := SELECT DISTINCT a, b AS c FROM l LEFT JOIN r ON z = x WHERE w = t
+def s : SQLQuery := SELECT DISTINCT (a), b AS c
+  FROM (l) AS ll LEFT JOIN r ON z = x
+  WHERE w = t
 #eval s.toString
