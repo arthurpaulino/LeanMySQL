@@ -23,6 +23,12 @@ syntax "DISTINCT " "*"           : sqlSelect
 syntax selectField,+             : sqlSelect
 syntax "DISTINCT " selectField,+ : sqlSelect
 
+declare_syntax_cat    entry
+syntax num          : entry
+syntax "-" noWs num : entry
+syntax str          : entry
+syntax "NULL"       : entry
+
 declare_syntax_cat               sqlProp
 syntax "TRUE"                  : sqlProp
 syntax "FALSE"                 : sqlProp
@@ -32,6 +38,7 @@ syntax parsId "<"  parsId      : sqlProp
 syntax parsId "<=" parsId      : sqlProp
 syntax parsId ">"  parsId      : sqlProp
 syntax parsId ">=" parsId      : sqlProp
+syntax parsId "="  entry       : sqlProp
 syntax sqlProp " AND " sqlProp : sqlProp
 syntax sqlProp " OR "  sqlProp : sqlProp
 syntax " NOT " sqlProp         : sqlProp
@@ -44,7 +51,7 @@ syntax " RIGHT " : join
 syntax " OUTER " : join
 
 declare_syntax_cat                                    sqlFrom
-syntax ident                                       : sqlFrom
+syntax ident                                        : sqlFrom
 syntax sqlFrom " AS " ident                         : sqlFrom
 syntax sqlFrom join " JOIN " sqlFrom " ON " sqlProp : sqlFrom
 syntax "(" sqlFrom ")"                              : sqlFrom
@@ -80,7 +87,20 @@ def mkSelect : Syntax → TermElabM Expr
 def mkConstM (name : Name) : MetaM Expr :=
   pure $ mkConst name
 
+def mkEntry : Syntax → TermElabM Expr
+  | `(entry|$v:numLit)  =>
+    mkAppM `DataEntry.EInt #[mkApp (mkConst `Int.ofNat) (mkNatLit v.toNat)]
+  | `(entry|-$v:numLit) =>
+    mkAppM `DataEntry.EInt $ match v.toNat with
+      | Nat.zero   => #[mkApp (mkConst `Int.ofNat) (mkConst `Nat.zero)]
+      | Nat.succ n => #[mkApp (mkConst `Int.negSucc) (mkNatLit n)]
+  | `(entry|$v:strLit)  => mkConstM `DataEntry.ENull
+  | `(entry|NULL)       => mkConstM `DataEntry.ENull
+  | _                   => throwUnsupportedSyntax
+
 def mkProp : Syntax → TermElabM Expr
+  | `(sqlProp|$id:parsId = $e:entry) => do
+    mkAppM `SQLProp.eqE #[← mkStrOfParsId id, ← mkEntry e]
   | stx => mkConstM `SQLProp.tt
 
 def mkJoin : Syntax → TermElabM Expr
@@ -111,5 +131,5 @@ partial def mkFrom : Syntax → TermElabM Expr
 #check SELECT (a), b AS c FROM f
 def s : SQLQuery := SELECT DISTINCT (a), b AS c
   FROM (l) AS ll LEFT JOIN r ON z = x
-  WHERE w = t
+  WHERE w = -0
 #eval s.toString
