@@ -15,7 +15,7 @@ inductive DataType
 
 /- Prouces a `DataEntry` given its `DataType` and a `String` -/
 def DataType.entryOfString! (dataType : DataType) (s : String) : DataEntry :=
-  if s = "NULL" then NULL
+  if s = "NULL" then NIL
   else match dataType with
   | DataType.TInt    => s.toInt!
   | DataType.TFloat  => toFloat! s

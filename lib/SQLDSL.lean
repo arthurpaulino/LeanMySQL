@@ -89,16 +89,3 @@ def SQLFrom.toString : SQLFrom → String
 
 def SQLQuery.toString (q : SQLQuery) : String :=
   s!"SELECT {q.SELECT.toString} FROM {q.FROM.toString} WHERE {q.WHERE.toString}"
-
-open SQLSelectField SQLSelect SQLJoin SQLFrom SQLProp
-
-def q : SQLQuery := ⟨
-  list true [col "name", alias "age" "age_years"],
-  join left (table "person") (table "job") (eqC "person.job_id" "job.id"),
-  and (eqE "name" "Arthur") (ltE "age" 50)
-⟩
-
-#eval q.toString
--- SELECT DISTINCT name, age AS age_years
--- FROM person LEFT JOIN job ON person.job_id = job.id
--- WHERE (name = 'Arthur') AND (age < 50)"

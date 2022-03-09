@@ -13,7 +13,7 @@ inductive DataEntry
   | ENull
   deriving Inhabited
 
-def NULL := DataEntry.ENull
+def NIL : DataEntry := DataEntry.ENull
 
 instance : OfNat DataEntry n where
   ofNat := DataEntry.EInt (Int.ofNat n)
