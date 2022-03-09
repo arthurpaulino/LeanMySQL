@@ -32,8 +32,10 @@ def main : IO Unit := do
   mysql.insertIntoTable "person" [2, "Bob", 21, 1.64, 2, 3]
   mysql.insertIntoTable "person" [3, "Craig", 22, 1.76, NIL, 2]
 
-  let df ← mysql.query (SELECT name, age, height, job_name
-    FROM person LEFT JOIN job ON person.job_id = job.id)
+  let df ← mysql.query $
+    SELECT name, age, height, job_name
+    FROM person LEFT JOIN job ON person.job_id = job.id
+    WHERE person.age > 20
 
   IO.println $ df
 
