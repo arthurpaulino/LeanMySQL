@@ -33,8 +33,10 @@ def main : IO Unit := do
   mysql.insertIntoTable "person" [2, "Bob", 21, 1.64, 2, 3]
   mysql.insertIntoTable "person" [3, "Craig", 22, 1.76, NULL, 2]
 
-  let df ← mysql.query ("select name, age, height, job_name " ++
-    "from person left join job on person.job_id = job.id")
+  let df ← mysql.query $
+    SELECT name, age, height, job_name
+    FROM person LEFT JOIN job ON person.job_id = job.id
+    WHERE person.age > 20
 
   IO.println $ df
 
@@ -44,17 +46,15 @@ def main : IO Unit := do
 The example above prints out:
 
 ```
-8.0.27
-|   name|age|height|            job_name|
-|-------|---|------|--------------------|
-|'Alice'| 20|  1.72|'Computer Scientist'|
-|  'Bob'| 21|  1.64|     'Mathematician'|
-|'Craig'| 22|  1.76|                NULL|
+8.0.28
+|   name|age|height|       job_name|
+|-------|---|------|---------------|
+|  'Bob'| 21|  1.64|'Mathematician'|
+|'Craig'| 22|  1.76|           NULL|
 ```
 
 ## What's next?
 
-* Replace lists by arrays in the implementation of dataframes
-* Provide a proper SQL DSL instead of relying on unsafe strings
+* Allow queries on the `FROM` clause
 
 Feel free to contribute! :D

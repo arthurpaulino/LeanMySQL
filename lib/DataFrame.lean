@@ -4,6 +4,7 @@
   Authors: Arthur Paulino
 -/
 
+import DataEntries
 import Utils
 
 inductive DataType
@@ -12,46 +13,15 @@ inductive DataType
   | TString
   deriving Inhabited
 
-open DataType
-
-inductive DataEntry
-  | EInt (i : Int)
-  | EFloat (f : Float)
-  | EString (s : String)
-  | ENull
-  deriving Inhabited
-
-def NULL := DataEntry.ENull
-
-instance : OfNat DataEntry n where
-  ofNat := DataEntry.EInt (Int.ofNat n)
-
-instance : Coe Int DataEntry where
-  coe := DataEntry.EInt
-
-instance : Coe Float DataEntry where
-  coe := DataEntry.EFloat
-
-instance : Neg DataEntry where
-  neg e := match e with
-  | DataEntry.EInt   i => ((-1 : Int) * i : Int)
-  | DataEntry.EFloat f => ((-1 : Float) * f : Float)
-  | _                  => panic! "invalid DataEntry"
-
-instance : OfScientific DataEntry where
-  ofScientific m s e := DataEntry.EFloat (OfScientific.ofScientific m s e)
-
-instance : Coe String DataEntry where
-  coe := DataEntry.EString
-
 /- Prouces a `DataEntry` given its `DataType` and a `String` -/
 def DataType.entryOfString! (dataType : DataType) (s : String) : DataEntry :=
-  if s = "NULL" then NULL
+  if s = "NULL" then NIL
   else match dataType with
   | DataType.TInt    => s.toInt!
   | DataType.TFloat  => toFloat! s
   | DataType.TString => s
 
+open DataType in
 /- Whether a `DataEntry` is of a `DataType` or not -/
 @[simp] def DataEntry.ofType : DataEntry → DataType → Bool
   | EInt _,    TInt    => true
@@ -59,14 +29,6 @@ def DataType.entryOfString! (dataType : DataType) (s : String) : DataEntry :=
   | EString _, TString => true
   | ENull,     _       => true
   | _,         _       => false
-
-/- The `String` representation of a `DataEntry` -/
-protected def DataEntry.toString (e : DataEntry) : String := 
-  match e with
-  | EInt e    => toString e
-  | EFloat e  => optimizeFloatString $ toString e
-  | EString e => s!"'{e}'"
-  | ENull     => "NULL"
 
 instance : ToString DataEntry where
   toString e := e.toString

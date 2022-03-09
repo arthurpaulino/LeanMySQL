@@ -6,6 +6,7 @@
 
 import DataFrame
 import Std
+import SQLSyntax
 
 @[extern "lean_mysql_initialize"]
 constant initMySQL : BaseIO Unit
@@ -106,8 +107,8 @@ def insertIntoTable (m : MySQL) (n : String) (r : DataEntries) : IO Unit :=
 private constant processQueryResult (m : MySQL) : String
 
 /- Runs an SQL query and returns a `DataFrame` with the results -/
-def query (m : MySQL) (q : String) : IO DataFrame := do
-  m.run q
+def query (m : MySQL) (q : SQLQuery) : IO DataFrame := do
+  m.run q.toString
   pure $ DataFrame.fromString (processQueryResult m)
 
 /- Closes the connection with the MySQL server -/

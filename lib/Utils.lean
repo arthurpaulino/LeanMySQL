@@ -16,11 +16,11 @@ def withoutRightmostZeros (s : String) : String := Id.run do
     for i in [0 : data.length] do
       rangeList := rangeList.concat i
     for i in rangeList.reverse do
-      if i = 0 then
-        return ""
       if (data.get! i) ≠ '0' then
         let sub : Substring := ⟨s, 0, i + 1⟩
         return sub.toString
+      if i = 0 then
+        return ""
     s
   else
     s

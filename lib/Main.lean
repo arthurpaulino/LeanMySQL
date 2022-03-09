@@ -30,10 +30,12 @@ def main : IO Unit := do
     ]
   mysql.insertIntoTable "person" [1, "Alice", 20, 1.72, 1, 1]
   mysql.insertIntoTable "person" [2, "Bob", 21, 1.64, 2, 3]
-  mysql.insertIntoTable "person" [3, "Craig", 22, 1.76, NULL, 2]
+  mysql.insertIntoTable "person" [3, "Craig", 22, 1.76, NIL, 2]
 
-  let df ← mysql.query ("select name, age, height, job_name " ++
-    "from person left join job on person.job_id = job.id")
+  let df ← mysql.query $
+    SELECT name, age, height, job_name
+    FROM person LEFT JOIN job ON person.job_id = job.id
+    WHERE person.age > 20
 
   IO.println $ df
 
