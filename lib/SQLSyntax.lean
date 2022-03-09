@@ -93,6 +93,9 @@ def mkApp' (name : Name) (e : Expr) : Expr :=
 def mkConstM (name : Name) : TermElabM Expr :=
   pure $ mkConst name
 
+def inverseFloat (f : Float) : Float :=
+  -1.0 * f
+
 partial def mkEntry : Syntax → TermElabM Expr
   | `(entry|$v:numLit)         =>
     mkAppM `DataEntry.EInt #[mkApp' `Int.ofNat (mkNatLit v.toNat)]
@@ -104,7 +107,9 @@ partial def mkEntry : Syntax → TermElabM Expr
     mkAppM `DataEntry.EString #[mkStrLit $ v.isStrLit?.getD ""]
   | `(entry|$v:scientificLit)  => do
     mkAppM `DataEntry.EFloat #[← Term.elabScientificLit v (mkConst `Float)]
-  -- | `(entry|-$v:scientificLit)  => 
+  | `(entry|-$v:scientificLit) => do
+    let f ← Term.elabScientificLit v (mkConst `Float)
+    mkAppM `DataEntry.EFloat #[mkApp' `inverseFloat f]
   | `(entry|NULL)              => mkConstM `DataEntry.ENull
   | `(entry|($e:entry))        => mkEntry e
   | _                          => throwUnsupportedSyntax
@@ -142,5 +147,5 @@ partial def mkFrom : Syntax → TermElabM Expr
 #check SELECT (a), b AS c FROM f
 def s : SQLQuery := SELECT DISTINCT (a), b AS c
   FROM (l) AS ll LEFT JOIN r ON z = x
-  WHERE w = 1.4
+  WHERE w = -1.4
 #eval s.toString
