@@ -37,10 +37,10 @@ inductive SQLJoin
   | inner | left | right | outer
 
 inductive SQLFrom
-  | table         : String  → SQLFrom
-  | alias         : SQLFrom → String  → SQLFrom
-  | join          : SQLJoin → SQLFrom → SQLFrom → SQLProp → SQLFrom
-  | implicitJoin  : SQLFrom → SQLFrom → SQLFrom
+  | table        : String  → SQLFrom
+  | alias        : SQLFrom → String  → SQLFrom
+  | join         : SQLJoin → SQLFrom → SQLFrom → SQLProp → SQLFrom
+  | implicitJoin : SQLFrom → SQLFrom → SQLFrom
 
 structure SQLQuery where
   SELECT : SQLSelect
@@ -63,8 +63,8 @@ def SQLSelect.toString : SQLSelect → String
 instance : ToString SQLSelect := ⟨SQLSelect.toString⟩
 
 def SQLProp.toString : SQLProp → String
-  | tt     => "TRUE"
-  | ff     => "FALSE"
+  | tt      => "TRUE"
+  | ff      => "FALSE"
   | eqC l r => s!"{l} = {r}"
   | neC l r => s!"{l} <> {r}"
   | ltC l r => s!"{l} < {r}"
@@ -92,10 +92,10 @@ def SQLJoin.toString : SQLJoin → String
 instance : ToString SQLJoin := ⟨SQLJoin.toString⟩
 
 def SQLFrom.toString : SQLFrom → String
-  | implicitJoin t₁ t₂ => s!"{t₁.toString}, {t₂.toString}"
   | table s            => s
   | alias f s          => s!"({f.toString}) AS {s}"
   | join  j l r p      => s!"{l.toString} {j} JOIN {r.toString} ON {p}"
+  | implicitJoin t₁ t₂ => s!"{t₁.toString}, {t₂.toString}"
 
 instance : ToString SQLFrom := ⟨SQLFrom.toString⟩
 

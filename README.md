@@ -55,6 +55,7 @@ The example above prints out:
 
 ## What's next?
 
-* Allow queries on the `FROM` clause
+* Allow queries on the `FROM` clause (nested queries)
+* Expand the implicit join so it can accept multiple sources, not just two
 
 Feel free to contribute! :D
