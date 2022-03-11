@@ -35,6 +35,7 @@ syntax "(" entry ")"       : entry
 declare_syntax_cat propSymbol
 syntax " = "     : propSymbol
 syntax " <> "    : propSymbol
+syntax " != "    : propSymbol
 syntax " < "     : propSymbol
 syntax " <= "    : propSymbol
 syntax " > "     : propSymbol
@@ -58,6 +59,7 @@ syntax " OUTER " : join
 
 declare_syntax_cat                                 sqlFrom
 syntax ident                                     : sqlFrom
+syntax sqlFrom ", " sqlFrom                      : sqlFrom
 syntax sqlFrom " AS " ident                      : sqlFrom
 syntax sqlFrom join " JOIN " sqlFrom " ON " prop : sqlFrom
 syntax "(" sqlFrom ")"                           : sqlFrom
@@ -67,39 +69,39 @@ syntax (name := query) "SELECT " sqlSelect " FROM " sqlFrom (" WHERE " prop)? : 
 def mkStrOfIdent (id : Syntax) : Expr :=
   mkStrLit id.getId.toString
 
-partial def mkStrOfParsId : Syntax → TermElabM Expr
+partial def elabStrOfParsId : Syntax → TermElabM Expr
   | `(parsId|$id:ident)      => pure $ mkStrLit id.getId.toString
-  | `(parsId|($pars:parsId)) => mkStrOfParsId pars
+  | `(parsId|($pars:parsId)) => elabStrOfParsId pars
   | _                        => throwUnsupportedSyntax
 
-def mkCol : Syntax → TermElabM Expr
+def elabCol : Syntax → TermElabM Expr
   | `(selectField|$c:parsId)             => do
-    mkAppM `SQLSelectField.col #[← mkStrOfParsId c]
+    mkAppM `SQLSelectField.col #[← elabStrOfParsId c]
   | `(selectField|$c:parsId AS $a:ident) => do
-    mkAppM `SQLSelectField.alias #[← mkStrOfParsId c, mkStrOfIdent a]
+    mkAppM `SQLSelectField.alias #[← elabStrOfParsId c, mkStrOfIdent a]
   | _                                    => throwUnsupportedSyntax
 
-def mkSelect : Syntax → TermElabM Expr
+def elabSelect : Syntax → TermElabM Expr
   | `(sqlSelect|*)                          => mkAppM `SQLSelect.all #[mkConst ``false]
   | `(sqlSelect|DISTINCT *)                 => mkAppM `SQLSelect.all #[mkConst ``true]
   | `(sqlSelect|$cs:selectField,*)          => do
-    let cols ← mkListLit (mkConst `SQLSelectField) (← cs.getElems.toList.mapM mkCol)
+    let cols ← mkListLit (mkConst `SQLSelectField) (← cs.getElems.toList.mapM elabCol)
     mkAppM `SQLSelect.list #[mkConst ``false, cols]
   | `(sqlSelect|DISTINCT $cs:selectField,*) => do
-    let cols ← mkListLit (mkConst `SQLSelectField) (← cs.getElems.toList.mapM mkCol)
+    let cols ← mkListLit (mkConst `SQLSelectField) (← cs.getElems.toList.mapM elabCol)
     mkAppM `SQLSelect.list #[mkConst ``true, cols]
   | _                                       => throwUnsupportedSyntax
 
 def mkApp' (name : Name) (e : Expr) : Expr :=
   mkApp (mkConst name) e
 
-def mkConstM (name : Name) : TermElabM Expr :=
+def elabConst (name : Name) : TermElabM Expr :=
   pure $ mkConst name
 
 def negFloat (f : Float) : Float :=
   -1.0 * f
 
-partial def mkEntry : Syntax → TermElabM Expr
+partial def elabEntry : Syntax → TermElabM Expr
   | `(entry|$v:numLit)         =>
     mkAppM `DataEntry.EInt #[mkApp' `Int.ofNat (mkNatLit v.toNat)]
   | `(entry|-$v:numLit)        =>
@@ -113,57 +115,59 @@ partial def mkEntry : Syntax → TermElabM Expr
     mkAppM `DataEntry.EFloat #[mkApp' `negFloat f]
   | `(entry|$v:strLit)         =>
     mkAppM `DataEntry.EString #[mkStrLit $ v.isStrLit?.getD ""]
-  | `(entry|NULL)              => mkConstM `DataEntry.ENull
-  | `(entry|($e:entry))        => mkEntry e
+  | `(entry|NULL)              => elabConst `DataEntry.ENull
+  | `(entry|($e:entry))        => elabEntry e
   | _                          => throwUnsupportedSyntax
 
-def mkPropSymbol (stx : Syntax) (isEntry : Bool) : TermElabM Name :=
+def elabPropSymbol (stx : Syntax) (isEntry : Bool) : TermElabM Name :=
   match stx with
   | `(propSymbol|=)  => pure $ if isEntry then `SQLProp.eqE else `SQLProp.eqC
   | `(propSymbol|<>) => pure $ if isEntry then `SQLProp.neE else `SQLProp.neC
+  | `(propSymbol|!=) => pure $ if isEntry then `SQLProp.neE else `SQLProp.neC
   | `(propSymbol|<)  => pure $ if isEntry then `SQLProp.ltE else `SQLProp.ltC
   | `(propSymbol|<=) => pure $ if isEntry then `SQLProp.leE else `SQLProp.leC
   | `(propSymbol|>)  => pure $ if isEntry then `SQLProp.gtE else `SQLProp.gtC
   | `(propSymbol|>=) => pure $ if isEntry then `SQLProp.geE else `SQLProp.geC
   | _                => throwUnsupportedSyntax
 
-partial def mkProp : Syntax → TermElabM Expr
-  | `(prop|TRUE)                              => mkConstM `SQLProp.tt
-  | `(prop|FALSE)                             => mkConstM `SQLProp.ff
+partial def elabProp : Syntax → TermElabM Expr
+  | `(prop|TRUE)                              => elabConst `SQLProp.tt
+  | `(prop|FALSE)                             => elabConst `SQLProp.ff
   | `(prop|$l:parsId $s:propSymbol $r:parsId) => do
-    mkAppM (← mkPropSymbol s false) #[← mkStrOfParsId l, ← mkStrOfParsId r]
+    mkAppM (← elabPropSymbol s false) #[← elabStrOfParsId l, ← elabStrOfParsId r]
   | `(prop|$c:parsId $s:propSymbol $e:entry)  => do
-    mkAppM (← mkPropSymbol s true) #[← mkStrOfParsId c, ← mkEntry e]
+    mkAppM (← elabPropSymbol s true) #[← elabStrOfParsId c, ← elabEntry e]
   | `(prop|$l:prop AND $r:prop)               => do
-    mkAppM `SQLProp.and #[← mkProp l, ← mkProp r]
+    mkAppM `SQLProp.and #[← elabProp l, ← elabProp r]
   | `(prop|$l:prop OR $r:prop)                => do
-    mkAppM `SQLProp.or #[← mkProp l, ← mkProp r]
+    mkAppM `SQLProp.or #[← elabProp l, ← elabProp r]
   | `(prop|NOT $p:prop)                       => do
-    mkAppM `SQLProp.not #[← mkProp p]
-  | `(prop|($p:prop))                         => mkProp p
+    mkAppM `SQLProp.not #[← elabProp p]
+  | `(prop|($p:prop))                         => elabProp p
   | _                                         => throwUnsupportedSyntax
 
-def mkJoin : Syntax → TermElabM Expr
-  | `(join|INNER) => mkConstM `SQLJoin.inner
-  | `(join|LEFT)  => mkConstM `SQLJoin.left
-  | `(join|RIGHT) => mkConstM `SQLJoin.right
-  | `(join|OUTER) => mkConstM `SQLJoin.outer
+def elabJoin : Syntax → TermElabM Expr
+  | `(join|INNER) => elabConst `SQLJoin.inner
+  | `(join|LEFT)  => elabConst `SQLJoin.left
+  | `(join|RIGHT) => elabConst `SQLJoin.right
+  | `(join|OUTER) => elabConst `SQLJoin.outer
   | _             => throwUnsupportedSyntax
 
-partial def mkFrom : Syntax → TermElabM Expr
+partial def elabFrom : Syntax → TermElabM Expr
   | `(sqlFrom|$t:ident)               => mkAppM `SQLFrom.table #[mkStrOfIdent t]
   | `(sqlFrom|$f:sqlFrom AS $t:ident) => do
-    mkAppM `SQLFrom.alias #[← mkFrom f, mkStrOfIdent t]
+    mkAppM `SQLFrom.alias #[← elabFrom f, mkStrOfIdent t]
+  | `(sqlFrom|$t₁:sqlFrom, $t₂:sqlFrom) => do mkAppM `SQLFrom.implicitJoin #[← elabFrom t₁, ← elabFrom t₂]
   | `(sqlFrom|$l:sqlFrom $j:join JOIN $r:sqlFrom ON $p:prop) => do
-    mkAppM `SQLFrom.join #[← mkJoin j, ← mkFrom l, ← mkFrom r, ← mkProp p]
-  | `(sqlFrom|($f:sqlFrom))           => mkFrom f
+    mkAppM `SQLFrom.join #[← elabJoin j, ← elabFrom l, ← elabFrom r, ← elabProp p]
+  | `(sqlFrom|($f:sqlFrom))           => elabFrom f
   | _                                 => throwUnsupportedSyntax
 
 @[termElab query] def elabQuery : Term.TermElab := fun stx _ =>
   match stx with
   | `(query| SELECT $sel FROM $frm $[WHERE $prp]?) => do
     let whr ← match prp with
-    | none     => mkConstM `SQLProp.tt
-    | some prp => mkProp prp
-    mkAppM `SQLQuery.mk #[← mkSelect sel, ← mkFrom frm, whr]
+    | none     => elabConst `SQLProp.tt
+    | some prp => elabProp prp
+    mkAppM `SQLQuery.mk #[← elabSelect sel, ← elabFrom frm, whr]
   | _ => throwUnsupportedSyntax
