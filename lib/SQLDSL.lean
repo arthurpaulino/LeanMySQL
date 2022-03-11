@@ -84,10 +84,10 @@ def SQLJoin.toString : SQLJoin → String
   | outer => "OUTER"
 
 def SQLFrom.toString : SQLFrom → String
-  | SQLFrom.implicitJoin t₁ t₂ => s!"{t₁.toString}, {t₂.toString}"
-  | table s                    => s
-  | alias f s                  => s!"({f.toString}) AS {s}"
-  | join  j l r p              => s!"{l.toString} {j.toString} JOIN {r.toString} ON {p.toString}"
+  | implicitJoin t₁ t₂ => s!"{t₁.toString}, {t₂.toString}"
+  | table s            => s
+  | alias f s          => s!"({f.toString}) AS {s}"
+  | join  j l r p      => s!"{l.toString} {j.toString} JOIN {r.toString} ON {p.toString}"
 
 def SQLQuery.toString (q : SQLQuery) : String :=
   s!"SELECT {q.SELECT.toString} FROM {q.FROM.toString} WHERE {q.WHERE.toString}"
