@@ -43,3 +43,5 @@ protected def DataEntry.toString (e : DataEntry) : String :=
   | EFloat e  => optimizeFloatString $ toString e
   | EString e => s!"'{e}'"
   | ENull     => "NULL"
+
+instance : ToString DataEntry := ⟨DataEntry.toString⟩
