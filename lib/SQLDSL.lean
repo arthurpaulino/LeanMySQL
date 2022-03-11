@@ -37,9 +37,10 @@ inductive SQLJoin
   | inner | left | right | outer
 
 inductive SQLFrom
-  | table : String  → SQLFrom
-  | alias : SQLFrom → String  → SQLFrom
-  | join  : SQLJoin → SQLFrom → SQLFrom → SQLProp → SQLFrom
+  | table         : String  → SQLFrom
+  | alias         : SQLFrom → String  → SQLFrom
+  | join          : SQLJoin → SQLFrom → SQLFrom → SQLProp → SQLFrom
+  | implicitJoin  : SQLFrom → SQLFrom → SQLFrom
 
 structure SQLQuery where
   SELECT : SQLSelect
@@ -50,12 +51,16 @@ def SQLSelectField.toString : SQLSelectField → String
   | col   c   => c
   | alias c a => s!"{c} AS {a}"
 
+instance : ToString SQLSelectField := ⟨SQLSelectField.toString⟩
+
 def SQLSelect.distinct? (d : Bool) : String :=
   if d then "DISTINCT " else default
 
 def SQLSelect.toString : SQLSelect → String
   | list d l => (distinct? d).append $ ", ".intercalate $ l.map (SQLSelectField.toString)
   | all  d   => (distinct? d).append $ "*"
+
+instance : ToString SQLSelect := ⟨SQLSelect.toString⟩
 
 def SQLProp.toString : SQLProp → String
   | tt     => "TRUE"
@@ -66,15 +71,17 @@ def SQLProp.toString : SQLProp → String
   | leC l r => s!"{l} <= {r}"
   | gtC l r => s!"{l} > {r}"
   | geC l r => s!"{l} >= {r}"
-  | eqE l r => s!"{l} = {r.toString}"
-  | neE l r => s!"{l} <> {r.toString}"
-  | ltE l r => s!"{l} < {r.toString}"
-  | leE l r => s!"{l} <= {r.toString}"
-  | gtE l r => s!"{l} > {r.toString}"
-  | geE l r => s!"{l} >= {r.toString}"
+  | eqE l r => s!"{l} = {r}"
+  | neE l r => s!"{l} <> {r}"
+  | ltE l r => s!"{l} < {r}"
+  | leE l r => s!"{l} <= {r}"
+  | gtE l r => s!"{l} > {r}"
+  | geE l r => s!"{l} >= {r}"
   | and l r => s!"({l.toString}) AND ({r.toString})"
   | or  l r => s!"({l.toString}) OR ({r.toString})"
   | not w   => s!"NOT ({w.toString})"
+
+instance : ToString SQLProp := ⟨SQLProp.toString⟩
 
 def SQLJoin.toString : SQLJoin → String
   | inner => "INNER"
@@ -82,10 +89,17 @@ def SQLJoin.toString : SQLJoin → String
   | right => "RIGHT"
   | outer => "OUTER"
 
+instance : ToString SQLJoin := ⟨SQLJoin.toString⟩
+
 def SQLFrom.toString : SQLFrom → String
-  | table s       => s
-  | alias f s     => s!"({f.toString}) AS {s}"
-  | join  j l r p => s!"{l.toString} {j.toString} JOIN {r.toString} ON {p.toString}"
+  | implicitJoin t₁ t₂ => s!"{t₁.toString}, {t₂.toString}"
+  | table s            => s
+  | alias f s          => s!"({f.toString}) AS {s}"
+  | join  j l r p      => s!"{l.toString} {j} JOIN {r.toString} ON {p}"
+
+instance : ToString SQLFrom := ⟨SQLFrom.toString⟩
 
 def SQLQuery.toString (q : SQLQuery) : String :=
-  s!"SELECT {q.SELECT.toString} FROM {q.FROM.toString} WHERE {q.WHERE.toString}"
+  s!"SELECT {q.SELECT} FROM {q.FROM} WHERE {q.WHERE}"
+
+instance : ToString SQLQuery := ⟨SQLQuery.toString⟩
