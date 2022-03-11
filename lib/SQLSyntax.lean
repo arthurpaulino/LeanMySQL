@@ -59,7 +59,7 @@ syntax " OUTER " : join
 
 declare_syntax_cat                                 sqlFrom
 syntax ident                                     : sqlFrom
-syntax sqlFrom,+                                 : sqlFrom
+syntax sqlFrom ", " sqlFrom                      : sqlFrom
 syntax sqlFrom " AS " ident                      : sqlFrom
 syntax sqlFrom join " JOIN " sqlFrom " ON " prop : sqlFrom
 syntax "(" sqlFrom ")"                           : sqlFrom
